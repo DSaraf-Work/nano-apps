@@ -1136,7 +1136,8 @@ input:checked + .toggle-slider:before { transform: translateX(18px); background:
           font-size: 11px;
           color: var(--text-muted);
           margin-top: 4px;
-        ">Try: "Remind to call John at 3pm IST on tomorrow"</div>
+          line-height: 1.6;
+        ">Try: "Remind me to call John at 3pm on Friday" &nbsp;·&nbsp; "Set a reminder to pay rent at 9am" &nbsp;·&nbsp; "Remind me to take meds in 2 hours" &nbsp;·&nbsp; "Remind me to gym tomorrow morning" &nbsp;·&nbsp; "Call dentist at 4pm tomorrow"</div>
       </div>
       <div class="form-group">
         <label class="form-label">Description</label>
@@ -1928,6 +1929,52 @@ const VOICE_PATTERNS = [
     name: 'remind-to · today/tomorrow · at TIME',
     regex: /^remind(?:\s+me)?\s+to\s+(?<title>.+?)\s+(?<date>today|tomorrow)\s+at\s+(?<time>[\d]{1,2}(?::\d{2})?\s*[ap]m(?:\s+ist)?)\s*$/i,
   },
+
+  // ── New patterns (most-specific to least-specific) ─────────────────
+
+  {
+    // "Set a reminder for call dentist at 3pm on Friday"
+    // "Set reminder to buy groceries at 10am on Monday"
+    name: 'set reminder · for/to TITLE · at TIME · on DATE',
+    regex: /^set\s+(?:a\s+)?reminder\s+(?:for|to)\s+(?<title>.+?)\s+at\s+(?<time>[\d]{1,2}(?::\d{2})?\s*[ap]m(?:\s+ist)?)\s+on\s+(?<date>.+?)\s*$/i,
+  },
+  {
+    // "Alert me to take medicine at 9am on Thursday"
+    // "Notify me to call back at 4pm on Monday"
+    name: 'alert/notify me · to TITLE · at TIME · on DATE',
+    regex: /^(?:alert|notify)\s+me\s+to\s+(?<title>.+?)\s+at\s+(?<time>[\d]{1,2}(?::\d{2})?\s*[ap]m(?:\s+ist)?)\s+on\s+(?<date>.+?)\s*$/i,
+  },
+  {
+    // "Remind me to pay rent on Friday at 9am"
+    // "Remind to submit report on Monday at 5pm"
+    name: 'remind-to · on DATE · at TIME',
+    regex: /^remind(?:\s+me)?\s+to\s+(?<title>.+?)\s+on\s+(?<date>(?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|today|tomorrow|(?:the\s+)?\d{1,2}(?:st|nd|rd|th)?(?:\s+\w+)?)\s+at\s+(?<time>[\d]{1,2}(?::\d{2})?\s*[ap]m(?:\s+ist)?)\s*$/i,
+  },
+  {
+    // "Remind me to call mom tomorrow morning"
+    // "Remind to take meds tonight"
+    // "Remind me to gym this evening"
+    name: 'remind-to · DATETIME phrase',
+    regex: /^remind(?:\s+me)?\s+to\s+(?<title>.+?)\s+(?<datetime>tomorrow\s+morning|tomorrow\s+afternoon|tomorrow\s+evening|tomorrow\s+night|tonight|this\s+evening|this\s+afternoon|this\s+morning|monday\s+morning|tuesday\s+morning|wednesday\s+morning|thursday\s+morning|friday\s+morning|saturday\s+morning|sunday\s+morning)\s*$/i,
+  },
+  {
+    // "Remind me to call John in 2 hours"
+    // "Remind to take pill in 30 minutes"
+    name: 'remind-to · in N hours/minutes',
+    regex: /^remind(?:\s+me)?\s+to\s+(?<title>.+?)\s+(?<reltime>in\s+\d+\s+(?:hour|hours|minute|minutes|mins|min|day|days))\s*$/i,
+  },
+  {
+    // "Set a reminder for call dentist at 3pm" (no date — implies today)
+    // "Set reminder to pick up kids at 4:30pm"
+    name: 'set reminder · for/to TITLE · at TIME',
+    regex: /^set\s+(?:a\s+)?reminder\s+(?:for|to)\s+(?<title>.+?)\s+at\s+(?<time>[\d]{1,2}(?::\d{2})?\s*[ap]m(?:\s+ist)?)\s*$/i,
+  },
+  {
+    // "Call dentist at 3pm" / "Pick up kids at 4:30pm tomorrow"
+    // Ultra-terse: title + time (optional date keyword)
+    name: 'TITLE · at TIME · (optional DATE)',
+    regex: /^(?<title>.+?)\s+at\s+(?<time>[\d]{1,2}(?::\d{2})?\s*[ap]m(?:\s+ist)?)(?:\s+(?<date>today|tomorrow|(?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)))?\s*$/i,
+  },
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -1956,11 +2003,16 @@ function matchVoicePattern(transcript) {
   for (const p of VOICE_PATTERNS) {
     const m = transcript.match(p.regex);
     if (m && m.groups) {
+      const g = m.groups;
       return {
         patternName: p.name,
-        title:   (m.groups.title  || '').trim(),
-        timeStr: (m.groups.time   || '').trim(),
-        dateStr: (m.groups.date   || '').trim(),
+        title:    (g.title    || '').trim(),
+        timeStr:  (g.time     || '').trim(),
+        dateStr:  (g.date     || '').trim(),
+        // Combined date+time phrase (e.g. "tomorrow morning", "tonight")
+        datetimeStr: (g.datetime || '').trim(),
+        // Relative time phrase (e.g. "in 2 hours", "in 30 minutes")
+        reltimeStr:  (g.reltime  || '').trim(),
       };
     }
   }
@@ -2073,12 +2125,35 @@ function processVoiceInput(transcript) {
   const title = match.title.charAt(0).toUpperCase() + match.title.slice(1);
   document.getElementById('inputTitle').value = title;
 
-  // ── Fill time ─────────────────────────────────────────────────────
-  const timeVal = parseTimeStr(match.timeStr);
-  if (timeVal) document.getElementById('inputTime').value = timeVal;
+  let timeVal = null;
+  let dateObj = null;
 
-  // ── Fill date ─────────────────────────────────────────────────────
-  const dateObj = parseDateStr(match.dateStr);
+  if (match.datetimeStr) {
+    // Combined phrase like "tomorrow morning", "tonight" — let chrono parse it whole
+    const dt = parseDateStr(match.datetimeStr);
+    if (dt) {
+      dateObj = dt;
+      const h = String(dt.getHours()).padStart(2, '0');
+      const mn = String(dt.getMinutes()).padStart(2, '0');
+      timeVal = `${h}:${mn}`;
+    }
+  } else if (match.reltimeStr) {
+    // Relative phrase like "in 2 hours", "in 30 minutes" — chrono resolves to absolute time
+    const dt = parseDateStr(match.reltimeStr);
+    if (dt) {
+      dateObj = dt;
+      const h = String(dt.getHours()).padStart(2, '0');
+      const mn = String(dt.getMinutes()).padStart(2, '0');
+      timeVal = `${h}:${mn}`;
+    }
+  } else {
+    // ── Fill time ─────────────────────────────────────────────────────
+    timeVal = parseTimeStr(match.timeStr);
+    // ── Fill date ─────────────────────────────────────────────────────
+    dateObj = parseDateStr(match.dateStr || 'today');
+  }
+
+  if (timeVal) document.getElementById('inputTime').value = timeVal;
   if (dateObj) {
     document.getElementById('inputDate').value = dateObj.toISOString().slice(0, 10);
   }
@@ -2092,13 +2167,13 @@ function processVoiceInput(transcript) {
 
   const datePart = dateObj
     ? dateObj.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
-    : match.dateStr || '?';
+    : match.dateStr || match.datetimeStr || match.reltimeStr || '?';
 
   if (transcriptEl) {
     transcriptEl.style.fontStyle = 'normal';
     transcriptEl.innerHTML =
       `<span style="color:var(--green)">✓</span> ${escHtml(title)}<br>` +
-      `<small style="color:var(--text-muted)">🕐 ${timeVal || match.timeStr} &nbsp;·&nbsp; 📅 ${datePart}</small>`;
+      `<small style="color:var(--text-muted)">🕐 ${timeVal || match.timeStr || match.datetimeStr || match.reltimeStr} &nbsp;·&nbsp; 📅 ${datePart}</small>`;
   }
   if (hintEl) hintEl.style.display = 'none';
 
