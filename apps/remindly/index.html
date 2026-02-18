@@ -2055,10 +2055,28 @@ function parseTimeStr(s) {
   return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 }
 
-// Parses "tomorrow", "Friday", "25 March" → Date object via chrono
+// Parses date strings → Date object (local midnight unless time implied)
+// Simple keywords are resolved natively — no chrono dependency for common cases.
 function parseDateStr(s) {
+  const clean = s.trim().toLowerCase();
+  const now   = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (clean === 'today')    return today;
+  if (clean === 'tomorrow') return new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+  // Day-of-week keywords (next occurrence, always future)
+  const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  const stripped = clean.replace(/^next\s+/, '');
+  const dayIdx = days.indexOf(stripped);
+  if (dayIdx !== -1) {
+    const diff = (dayIdx - today.getDay() + 7) % 7 || 7; // at least 1 day ahead
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate() + diff);
+  }
+
+  // Fallback to chrono for everything else ("in 2 hours", "25 March", "tomorrow morning" etc.)
   if (!window.chrono) return null;
-  const results = chrono.parse(s.trim(), new Date(), { forwardDate: true });
+  const results = chrono.parse(s.trim(), now, { forwardDate: true });
   return results.length ? results[0].start.date() : null;
 }
 
