@@ -99,9 +99,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 20px;
-  padding: 20px 12px 14px;
-  text-decoration: none;
-  color: inherit;
+  padding: 0;
   transition: all 0.2s;
   display: flex;
   flex-direction: column;
@@ -119,6 +117,16 @@ body {
 }
 
 .app-card:active { transform: scale(0.96); }
+
+.card-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+  padding: 20px 12px 10px;
+  width: 100%;
+}
 
 .app-icon {
   width: 60px;
@@ -143,20 +151,22 @@ body {
 .install-btn {
   font-size: 10px;
   font-family: 'DM Mono', monospace;
-  padding: 4px 10px;
-  border-radius: 20px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
+  padding: 5px 12px 8px;
+  border-radius: 0 0 20px 20px;
+  background: rgba(255,255,255,0.04);
+  border-top: 1px solid rgba(255,255,255,0.07);
   color: var(--text-muted);
-  cursor: pointer;
+  text-decoration: none;
   transition: all 0.2s;
   white-space: nowrap;
+  width: 100%;
+  display: block;
+  text-align: center;
 }
 
 .install-btn:hover {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.09);
   color: var(--text-dim);
-  border-color: rgba(255,255,255,0.2);
 }
 
 .footer {
@@ -203,28 +213,22 @@ button, .app-card, .tag, .hero-badge, .footer {
     installPrompts['__hub__'] = e;
   });
 
-  function installApp(e, slug) {
-    e.preventDefault();
-    e.stopPropagation();
-    // Open app in new tab; from there the browser offers its own install option
-    window.open(`./apps/${slug}/`, '_blank');
-  }
-
   function renderCard(slug, m) {
     const color = m.x_color || '#f59e0b';
     const rgb = hexToRgb(color);
     const icon = m.x_icon || '📦';
     const name = m.short_name || m.name;
-    const a = document.createElement('a');
-    a.href = `./apps/${slug}/`;
-    a.className = 'app-card';
-    a.style.setProperty('--card-color', color);
-    a.innerHTML = `
-      <div class="app-icon" style="--icon-bg: rgba(${rgb},0.12);">${icon}</div>
-      <div class="app-name">${name}</div>
-      <button class="install-btn" title="Open &amp; install as PWA">⬇ Install</button>`;
-    a.querySelector('.install-btn').addEventListener('click', e => installApp(e, slug));
-    return a;
+    // Wrap in a div, not <a>, so the install link and open link are independent
+    const card = document.createElement('div');
+    card.className = 'app-card';
+    card.style.setProperty('--card-color', color);
+    card.innerHTML = `
+      <a class="card-main" href="./apps/${slug}/">
+        <div class="app-icon" style="--icon-bg: rgba(${rgb},0.12);">${icon}</div>
+        <div class="app-name">${name}</div>
+      </a>
+      <a class="install-btn" href="./apps/${slug}/" target="_blank" rel="noopener" title="Open &amp; install as PWA">⬇ Install</a>`;
+    return card;
   }
 
   fetch('./apps/index.json')

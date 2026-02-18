@@ -562,6 +562,32 @@ body {
   margin-bottom: 20px;
 }
 
+.modal-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-close-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-dim);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-top: 2px;
+}
+
+.modal-close-btn:hover { background: rgba(255,255,255,0.13); color: var(--text); }
+
 .modal-title {
   font-family: 'Playfair Display', serif;
   font-size: 22px;
@@ -1154,8 +1180,13 @@ button, .header, .tab-bar, .badge, .filter-chip, .fab {
   <div class="modal" id="addModalInner">
     <div class="modal-handle"></div>
     <div class="modal-header">
-      <div class="modal-title" id="modalTitle">New Reminder</div>
-      <div class="modal-subtitle" id="modalSubtitle">Set up your reminder details below</div>
+      <div class="modal-header-row">
+        <div>
+          <div class="modal-title" id="modalTitle">New Reminder</div>
+          <div class="modal-subtitle" id="modalSubtitle">Set up your reminder details below</div>
+        </div>
+        <button class="modal-close-btn" onclick="closeModal()" aria-label="Close">✕</button>
+      </div>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -1741,6 +1772,40 @@ function closeModal() {
 function closeModalOnOverlay(e) {
   if (e.target === document.getElementById('addModal')) closeModal();
 }
+
+// ── Swipe-down to close modal ─────────────────────────────────────────
+(function() {
+  const modalEl = document.getElementById('addModalInner');
+  let startY = 0, currentY = 0, dragging = false;
+
+  modalEl.addEventListener('touchstart', e => {
+    // Only initiate drag from the handle or header area (top ~60px)
+    if (e.touches[0].clientY - modalEl.getBoundingClientRect().top > 60) return;
+    startY = e.touches[0].clientY;
+    dragging = true;
+    modalEl.style.transition = 'none';
+  }, { passive: true });
+
+  modalEl.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    currentY = e.touches[0].clientY;
+    const delta = Math.max(0, currentY - startY); // only downward
+    modalEl.style.transform = `translateY(${delta}px)`;
+  }, { passive: true });
+
+  modalEl.addEventListener('touchend', () => {
+    if (!dragging) return;
+    dragging = false;
+    modalEl.style.transition = '';
+    const delta = currentY - startY;
+    if (delta > 80) {
+      closeModal();
+    } else {
+      modalEl.style.transform = ''; // snap back
+    }
+    startY = 0; currentY = 0;
+  });
+})();
 
 function setDefaultDateTime() {
   const now = new Date(Date.now() + 3600000); // +1 hour
