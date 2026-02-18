@@ -1677,6 +1677,11 @@ function openAddModal() {
   document.getElementById('addModal').classList.add('open');
 }
 
+// Returns "YYYY-MM-DD" in LOCAL time — toISOString() gives UTC which shifts the date for +UTC offset timezones
+function localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 function openEditModal(id) {
   const r = reminders.find(r => r.id === id);
   if (!r) return;
@@ -1693,7 +1698,7 @@ function openEditModal(id) {
 
   if (r.nextFireAt) {
     const d = new Date(r.nextFireAt);
-    document.getElementById('inputDate').value = d.toISOString().slice(0, 10);
+    document.getElementById('inputDate').value = localDateStr(d);
     document.getElementById('inputTime').value = d.toTimeString().slice(0, 5);
   }
 
@@ -1727,7 +1732,7 @@ function closeModalOnOverlay(e) {
 
 function setDefaultDateTime() {
   const now = new Date(Date.now() + 3600000); // +1 hour
-  document.getElementById('inputDate').value = now.toISOString().slice(0, 10);
+  document.getElementById('inputDate').value = localDateStr(now);
   document.getElementById('inputTime').value = now.toTimeString().slice(0, 5);
 }
 
@@ -2333,7 +2338,7 @@ async function _processVoiceInputInner(transcript) {
     if (!timeVal) timeVal = `${String(fallback.getHours()).padStart(2,'0')}:${String(fallback.getMinutes()).padStart(2,'0')}`;
   }
 
-  const dateStr = dateObj.toISOString().slice(0, 10);
+  const dateStr = localDateStr(dateObj);
 
   // ── Save immediately ──────────────────────────────────────────────
   const saved = await autoSaveReminder(title, dateStr, timeVal);
