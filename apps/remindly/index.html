@@ -2079,12 +2079,13 @@ function matchVoicePattern(transcript) {
 }
 
 // ── Speech Recognition state ─────────────────────────────────────────
-let recognition      = null;
-let voiceActive      = false;
-let shouldBeRecording = false;  // Fix 2: tracks user intent (pressed start, not yet pressed stop)
-let silenceTimer     = null;
-let finalTranscript  = '';
-let voiceAutoSave    = false;   // Fix 3: true when triggered from floating mic (auto-save mode)
+let recognition         = null;
+let voiceActive         = false;
+let shouldBeRecording   = false;
+let silenceTimer        = null;
+let finalTranscript     = '';      // current session finals (reset per restart)
+let accumulatedTranscript = '';    // persists across iOS restarts — source of truth
+let voiceAutoSave       = false;
 
 function initVoice() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -2102,19 +2103,28 @@ function initVoice() {
   recognition.maxAlternatives = 1;
 
   recognition.onresult = e => {
-    let interim = '';
-    finalTranscript = '';
-    for (let i = 0; i < e.results.length; i++) {
-      if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+    // Only process NEW results since last event (e.resultIndex), not the whole array.
+    // This prevents transcript from resetting to '' mid-sentence on iOS restarts.
+    let newFinal = '';
+    let interim  = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) newFinal += e.results[i][0].transcript;
       else interim += e.results[i][0].transcript;
     }
+    if (newFinal) {
+      accumulatedTranscript = (accumulatedTranscript + ' ' + newFinal.trim()).trim();
+      finalTranscript = accumulatedTranscript;
+    }
+
     const transcriptEl = document.getElementById('voiceTranscript');
-    if (transcriptEl) transcriptEl.textContent = finalTranscript || interim;
+    if (transcriptEl) transcriptEl.textContent = accumulatedTranscript || interim;
 
     clearTimeout(silenceTimer);
-    if (finalTranscript) {
-      // Fix 1: silence timeout changed from 1500ms to 3000ms
-      silenceTimer = setTimeout(() => processVoiceInput(finalTranscript.trim()), 3000);
+    // Capture current value by const — immune to future resets by subsequent onresult events
+    const textForTimer = (accumulatedTranscript || interim).trim();
+    if (textForTimer) {
+      const captured = textForTimer;
+      silenceTimer = setTimeout(() => processVoiceInput(captured), 3000);
     }
   };
 
@@ -2179,24 +2189,26 @@ function _syncMicButtonState(isRecording) {
 }
 
 function toggleVoice() {
-  // Called from modal mic button — fills form, no auto-save
   voiceAutoSave = false;
-  if (voiceActive) {
+  // Use shouldBeRecording (intent) not voiceActive (state) — voiceActive can be false
+  // mid-iOS-restart while user still intends to record
+  if (shouldBeRecording) {
     shouldBeRecording = false;
     stopVoice();
-    if (finalTranscript.trim()) processVoiceInput(finalTranscript.trim());
+    const text = accumulatedTranscript.trim();
+    if (text) processVoiceInput(text);
   } else {
     startVoice();
   }
 }
 
-// Fix 4: floating mic button handler — auto-save mode
 function toggleFloatingVoice() {
   voiceAutoSave = true;
-  if (voiceActive) {
+  if (shouldBeRecording) {
     shouldBeRecording = false;
     stopVoice();
-    if (finalTranscript.trim()) processVoiceInput(finalTranscript.trim());
+    const text = accumulatedTranscript.trim();
+    if (text) processVoiceInput(text);
   } else {
     startVoice();
   }
@@ -2230,6 +2242,7 @@ async function startVoice() {
   if (!recognition && !initVoice()) { showToast('Voice not supported on this browser', 'red'); return; }
   if (!(await ensureMicPermission())) return;
   finalTranscript = '';
+  accumulatedTranscript = '';  // reset full transcript for new recording session
   shouldBeRecording = true;
   const transcriptEl = document.getElementById('voiceTranscript');
   const hintEl = document.getElementById('voiceHint');
@@ -2279,6 +2292,10 @@ async function autoSaveReminder(title, dateStr, timeStr) {
 async function processVoiceInput(transcript) {
   stopVoice();
   if (!transcript) return;
+  try { await _processVoiceInputInner(transcript); } catch(err) { showToast('Voice error: ' + err.message, 'red'); console.error('[voice]', err); }
+}
+
+async function _processVoiceInputInner(transcript) {
 
   const words = transcript.trim().split(/\s+/);
   if (words.length <= 4) {
@@ -2346,6 +2363,7 @@ const _origCloseModal = closeModal;
 closeModal = function() {
   stopVoice();
   finalTranscript = '';
+  accumulatedTranscript = '';
   voiceAutoSave = false;
   const transcriptEl = document.getElementById('voiceTranscript');
   const hintEl = document.getElementById('voiceHint');
