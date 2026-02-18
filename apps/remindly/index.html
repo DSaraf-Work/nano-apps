@@ -2388,8 +2388,26 @@ async function _processVoiceInputInner(transcript) {
       dateObj = parseDateStr(match.dateStr || 'today');
     }
   } else {
-    // No pattern match — use full transcript as title, default to 5 min from now
-    title = transcript.charAt(0).toUpperCase() + transcript.slice(1);
+    // No pattern match — attempt greedy extraction before falling back to full-text title.
+    // This handles Siri artifacts like "at 7 PM, 11 PM today" (two times, comma-separated).
+
+    // 1. Try to pull the FIRST valid time from anywhere in the string
+    const timeInStr = transcript.match(/\b(\d{1,2}(?::\d{2})?\s*[ap]m(?:\s+ist)?)\b/i);
+    if (timeInStr) timeVal = parseTimeStr(timeInStr[1]);
+
+    // 2. Try to pull a date keyword from anywhere in the string
+    const dateInStr = transcript.match(/\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|(?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?))\b/i);
+    if (dateInStr) dateObj = parseDateStr(dateInStr[1]);
+
+    // 3. Strip filler prefixes and the extracted time/date noise to form a clean title
+    let cleaned = transcript
+      .replace(/^remind(?:\s+me)?\s+to\s+/i, '')  // strip "remind me to"
+      .replace(/^set\s+(?:a\s+)?reminder\s+(?:for|to)\s+/i, '') // strip "set a reminder for"
+      .replace(/\s+at\s+\d{1,2}(?::\d{2})?\s*[ap]m(?:\s+ist)?(?:\s*,\s*\d{1,2}(?::\d{2})?\s*[ap]m(?:\s+ist)?)*/gi, '') // strip ALL times (handles "7 PM, 11 PM")
+      .replace(/\s+(?:on\s+)?(?:today|tomorrow)\b/gi, '')  // strip date keywords
+      .replace(/\s+on\s+(?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+      .trim();
+    title = (cleaned || transcript).charAt(0).toUpperCase() + (cleaned || transcript).slice(1);
   }
 
   // Fallback date/time if pattern didn't resolve them
