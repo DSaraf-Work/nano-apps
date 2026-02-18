@@ -1371,15 +1371,15 @@ let scheduledTimers = {};
   // ── Siri Shortcut / URL param intake ─────────────────────────────
   // When opened via "Hey Siri" + Shortcut, the URL contains ?reminder=<spoken text>
   // We parse it through the voice pipeline and auto-save, then show the edit modal.
-  const urlParams = new URLSearchParams(location.search);
-  const inboundText = urlParams.get('reminder') || urlParams.get('r');
-  if (inboundText && inboundText.trim()) {
+  function processUrlReminder() {
+    const p = new URLSearchParams(location.search);
+    const raw = p.get('reminder') || p.get('r');
+    if (!raw || !raw.trim()) return;
     // Clean the URL immediately so a refresh doesn't re-trigger
     history.replaceState(null, '', location.pathname);
-    const text = inboundText.trim(); // URLSearchParams already decodes — no need for decodeURIComponent
+    const text = raw.trim(); // URLSearchParams already decodes — no need for decodeURIComponent
     console.log('[remindly] URL intake received:', JSON.stringify(text));
     showToast('⏳ Processing: ' + text.slice(0, 40) + (text.length > 40 ? '…' : ''), 'amber');
-    // Call _processVoiceInputInner directly — bypass voice state entirely
     setTimeout(async () => {
       try { await _processVoiceInputInner(text, { fromUrl: true }); }
       catch (err) {
@@ -1388,6 +1388,15 @@ let scheduledTimers = {};
       }
     }, 500);
   }
+
+  processUrlReminder();
+
+  // iOS bfcache / PWA re-focus: pageshow fires when iOS restores the page
+  // from the back-forward cache or brings the PWA window to the front.
+  // In that case scripts don't re-run, but we can still read new URL params.
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) processUrlReminder();
+  });
 })();
 
 // ═══════════════════════════════════════════════════════════════════

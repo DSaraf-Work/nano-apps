@@ -16,8 +16,19 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // Navigation requests (HTML page loads): always network-first.
+  // This ensures iOS Safari always gets the latest index.html even when the
+  // service worker has a cached copy — critical for ?reminder= URL param intake.
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request)
+        .catch(() => caches.match(e.request).then(r => r || caches.match('/')))
+    );
+    return;
+  }
+  // Static assets (JS, CSS, images, manifest): cache-first for speed.
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request)).catch(() => caches.match('/index.html'))
+    caches.match(e.request).then(r => r || fetch(e.request)).catch(() => {})
   );
 });
 
