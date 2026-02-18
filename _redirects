@@ -1,8 +1,0 @@
-# Cloudflare Pages _redirects
-
-# Redirect /apps/remindly → /apps/remindly/ (trailing slash for SW scope)
-/apps/remindly  /apps/remindly/  301
-/apps/parkpin   /apps/parkpin/   301
-
-# Add more app redirects here as you add apps:
-# /apps/your-app  /apps/your-app/  301
