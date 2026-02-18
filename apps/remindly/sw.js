@@ -1,5 +1,6 @@
-const CACHE_NAME = 'remindly-v3';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+const CACHE_NAME = 'remindly-v4';
+// Only cache the manifest — never cache index.html so iOS always gets the latest code.
+const ASSETS = ['/manifest.json'];
 
 // ─── Install & Cache ───────────────────────────────────────────────────────────
 self.addEventListener('install', e => {

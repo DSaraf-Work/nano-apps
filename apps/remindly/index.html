@@ -1369,33 +1369,35 @@ let scheduledTimers = {};
   }, 60000);
 
   // ── Siri Shortcut / URL param intake ─────────────────────────────
-  // When opened via "Hey Siri" + Shortcut, the URL contains ?reminder=<spoken text>
-  // We parse it through the voice pipeline and auto-save, then show the edit modal.
-  function processUrlReminder() {
-    const p = new URLSearchParams(location.search);
-    const raw = p.get('reminder') || p.get('r');
-    if (!raw || !raw.trim()) return;
-    // Clean the URL immediately so a refresh doesn't re-trigger
+  // Runs inside the async IIFE so the await is guaranteed to complete.
+  // Using direct await (not setTimeout) is critical on iOS — detached
+  // setTimeout callbacks in SW-intercepted page loads can be silently dropped.
+  const _urlRaw = new URLSearchParams(location.search).get('reminder')
+               || new URLSearchParams(location.search).get('r');
+  if (_urlRaw && _urlRaw.trim()) {
     history.replaceState(null, '', location.pathname);
-    const text = raw.trim(); // URLSearchParams already decodes — no need for decodeURIComponent
-    console.log('[remindly] URL intake received:', JSON.stringify(text));
-    showToast('⏳ Processing: ' + text.slice(0, 40) + (text.length > 40 ? '…' : ''), 'amber');
-    setTimeout(async () => {
-      try { await _processVoiceInputInner(text, { fromUrl: true }); }
-      catch (err) {
-        console.error('[remindly] URL intake error:', err);
-        showToast('Error: ' + err.message, 'red');
-      }
-    }, 500);
+    const _urlText = _urlRaw.trim();
+    console.log('[remindly] URL intake:', JSON.stringify(_urlText));
+    showToast('⏳ ' + _urlText.slice(0, 40) + (_urlText.length > 40 ? '…' : ''), 'amber');
+    try {
+      await _processVoiceInputInner(_urlText, { fromUrl: true });
+    } catch (err) {
+      console.error('[remindly] URL intake error:', err);
+      showToast('Error: ' + err.message, 'red');
+    }
   }
 
-  processUrlReminder();
-
-  // iOS bfcache / PWA re-focus: pageshow fires when iOS restores the page
-  // from the back-forward cache or brings the PWA window to the front.
-  // In that case scripts don't re-run, but we can still read new URL params.
-  window.addEventListener('pageshow', (e) => {
-    if (e.persisted) processUrlReminder();
+  // iOS bfcache: pageshow fires when iOS restores a frozen page (scripts don't re-run)
+  window.addEventListener('pageshow', async (e) => {
+    if (!e.persisted) return;
+    const raw = new URLSearchParams(location.search).get('reminder')
+             || new URLSearchParams(location.search).get('r');
+    if (!raw || !raw.trim()) return;
+    history.replaceState(null, '', location.pathname);
+    const text = raw.trim();
+    showToast('⏳ ' + text.slice(0, 40) + (text.length > 40 ? '…' : ''), 'amber');
+    try { await _processVoiceInputInner(text, { fromUrl: true }); }
+    catch (err) { showToast('Error: ' + err.message, 'red'); }
   });
 })();
 
