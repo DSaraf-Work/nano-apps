@@ -11,8 +11,8 @@
   Content-Type: application/javascript; charset=utf-8
   Service-Worker-Allowed: /
 
-# Allow Leaflet tiles to be fetched cross-origin (needed for map caching)
-/apps/parkpin/*
+# Allow all app assets to be fetched cross-origin (needed for map tile caching, etc.)
+/apps/*/*
   Access-Control-Allow-Origin: *
 
 /apps/*/manifest.json

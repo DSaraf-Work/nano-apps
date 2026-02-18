@@ -22,6 +22,9 @@
       "purpose": "any maskable"
     }
   ],
+  "x_icon": "🅿️",
+  "x_color": "#34d87a",
+  "x_tags": ["PWA", "Maps", "Offline"],
   "categories": ["navigation", "utilities"],
   "shortcuts": [
     {
