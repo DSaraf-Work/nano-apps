@@ -1288,6 +1288,23 @@ button, .header, .tab-bar, .badge, .filter-chip, .fab {
 </div>
 
 <script>
+// ── Early URL capture — synchronous, before any async code ─────────────────
+// If the async IIFE fails mid-init (e.g. a render function throws on iOS),
+// the ?reminder= param is already saved to localStorage so it's never lost.
+(function() {
+  try {
+    const raw = new URLSearchParams(location.search).get('reminder')
+             || new URLSearchParams(location.search).get('r');
+    if (raw && raw.trim()) {
+      localStorage.setItem('_pendingReminder', raw.trim());
+      history.replaceState(null, '', location.pathname);
+      console.log('[remindly] Early capture OK:', JSON.stringify(raw.trim()));
+    }
+  } catch (e) {
+    console.warn('[remindly] Early capture failed (localStorage blocked?):', e);
+  }
+})();
+
 // ═══════════════════════════════════════════════════════════════════
 // DB
 // ═══════════════════════════════════════════════════════════════════
@@ -1352,12 +1369,13 @@ let scheduledTimers = {};
 (async () => {
   db = await openDB();
   reminders = await dbGetAll();
-  registerSW();
-  updateNotifBanner();
-  renderAll();
-  scheduleAll();
-  setupInstallPrompt();
-  setDefaultDateTime();
+  // Wrap each init in try/catch — a failure in one must not abort URL intake
+  try { registerSW(); } catch(e) { console.error('[remindly] registerSW:', e); }
+  try { updateNotifBanner(); } catch(e) { console.error('[remindly] updateNotifBanner:', e); }
+  try { renderAll(); } catch(e) { console.error('[remindly] renderAll:', e); }
+  try { scheduleAll(); } catch(e) { console.error('[remindly] scheduleAll:', e); }
+  try { setupInstallPrompt(); } catch(e) { console.error('[remindly] setupInstallPrompt:', e); }
+  try { setDefaultDateTime(); } catch(e) { console.error('[remindly] setDefaultDateTime:', e); }
 
   // Live clock in time display
   setInterval(() => {
@@ -1375,36 +1393,35 @@ let scheduledTimers = {};
   }, 60000);
 
   // ── Siri Shortcut / URL param intake ─────────────────────────────
-  // Runs inside the async IIFE so the await is guaranteed to complete.
-  // Using direct await (not setTimeout) is critical on iOS — detached
-  // setTimeout callbacks in SW-intercepted page loads can be silently dropped.
-  const _urlRaw = new URLSearchParams(location.search).get('reminder')
-               || new URLSearchParams(location.search).get('r');
-  if (_urlRaw && _urlRaw.trim()) {
-    history.replaceState(null, '', location.pathname);
-    const _urlText = _urlRaw.trim();
-    console.log('[remindly] URL intake:', JSON.stringify(_urlText));
-    showToast('⏳ ' + _urlText.slice(0, 40) + (_urlText.length > 40 ? '…' : ''), 'amber');
+  // Primary path: read from localStorage (captured synchronously above before any async code).
+  // Fallback: read directly from URL in case localStorage is blocked.
+  // This approach is immune to IIFE init failures dropping the URL param.
+  let _reminderText = null;
+  try {
+    _reminderText = localStorage.getItem('_pendingReminder');
+    if (_reminderText) localStorage.removeItem('_pendingReminder');
+  } catch(e) {
+    // localStorage blocked — fall through to URL fallback
+  }
+  if (!_reminderText) {
+    const _f = new URLSearchParams(location.search).get('reminder')
+            || new URLSearchParams(location.search).get('r');
+    if (_f && _f.trim()) {
+      _reminderText = _f.trim();
+      history.replaceState(null, '', location.pathname);
+    }
+  }
+
+  if (_reminderText) {
+    console.log('[remindly] URL intake processing:', JSON.stringify(_reminderText));
+    showToast('⏳ ' + _reminderText.slice(0, 40) + (_reminderText.length > 40 ? '…' : ''), 'amber');
     try {
-      await _processVoiceInputInner(_urlText, { fromUrl: true });
+      await _processVoiceInputInner(_reminderText, { fromUrl: true });
     } catch (err) {
       console.error('[remindly] URL intake error:', err);
       showToast('Error: ' + err.message, 'red');
     }
   }
-
-  // iOS bfcache: pageshow fires when iOS restores a frozen page (scripts don't re-run)
-  window.addEventListener('pageshow', async (e) => {
-    if (!e.persisted) return;
-    const raw = new URLSearchParams(location.search).get('reminder')
-             || new URLSearchParams(location.search).get('r');
-    if (!raw || !raw.trim()) return;
-    history.replaceState(null, '', location.pathname);
-    const text = raw.trim();
-    showToast('⏳ ' + text.slice(0, 40) + (text.length > 40 ? '…' : ''), 'amber');
-    try { await _processVoiceInputInner(text, { fromUrl: true }); }
-    catch (err) { showToast('Error: ' + err.message, 'red'); }
-  });
 })();
 
 // ═══════════════════════════════════════════════════════════════════

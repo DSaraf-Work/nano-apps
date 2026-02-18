@@ -1,4 +1,4 @@
-const CACHE_NAME = 'remindly-v5';
+const CACHE_NAME = 'remindly-v6';
 // Only precache the manifest. index.html is served via SWR — never pre-cached.
 const ASSETS = ['/manifest.json'];
 
