@@ -1,4 +1,4 @@
-const CACHE_NAME = 'remindly-v1';
+const CACHE_NAME = 'remindly-v3';
 const ASSETS = ['/', '/index.html', '/manifest.json'];
 
 // ─── Install & Cache ───────────────────────────────────────────────────────────
@@ -8,7 +8,11 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(clients.claim());
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(() => clients.claim())
+  );
 });
 
 self.addEventListener('fetch', e => {
