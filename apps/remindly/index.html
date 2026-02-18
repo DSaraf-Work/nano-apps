@@ -2055,26 +2055,57 @@ function parseTimeStr(s) {
   return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 }
 
-// Parses date strings → Date object (local midnight unless time implied)
-// Simple keywords are resolved natively — no chrono dependency for common cases.
+// Parses date strings → Date object (local midnight unless time implied).
+// Common cases resolved natively — chrono only for complex/relative phrases.
 function parseDateStr(s) {
   const clean = s.trim().toLowerCase();
   const now   = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+  // ── Keywords ────────────────────────────────────────────────────
   if (clean === 'today')    return today;
   if (clean === 'tomorrow') return new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-  // Day-of-week keywords (next occurrence, always future)
-  const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  const stripped = clean.replace(/^next\s+/, '');
-  const dayIdx = days.indexOf(stripped);
+  // ── Day-of-week (next occurrence, always ≥1 day ahead) ─────────
+  const weekdays = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  const dayName  = clean.replace(/^next\s+/, '');
+  const dayIdx   = weekdays.indexOf(dayName);
   if (dayIdx !== -1) {
-    const diff = (dayIdx - today.getDay() + 7) % 7 || 7; // at least 1 day ahead
+    const diff = (dayIdx - today.getDay() + 7) % 7 || 7;
     return new Date(today.getFullYear(), today.getMonth(), today.getDate() + diff);
   }
 
-  // Fallback to chrono for everything else ("in 2 hours", "25 March", "tomorrow morning" etc.)
+  // ── Ordinal/named month dates ───────────────────────────────────
+  // Handles: "19th Feb", "19 February", "Feb 19", "February 19th", "19th of February"
+  const MONTHS = ['january','february','march','april','may','june',
+                  'july','august','september','october','november','december'];
+  function monthIdx(m) { return MONTHS.findIndex(n => n.startsWith(m.toLowerCase().slice(0,3))); }
+
+  // Day-first: "19th Feb" / "19 February" / "19th of February"
+  const dmRe = /^(\d{1,2})(?:st|nd|rd|th)?(?:\s+of)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)$/i;
+  // Month-first: "Feb 19" / "February 19th"
+  const mdRe = /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?$/i;
+
+  const dm = clean.match(dmRe);
+  if (dm) {
+    const mi = monthIdx(dm[2]), day = parseInt(dm[1]);
+    if (mi !== -1 && day >= 1 && day <= 31) {
+      const d = new Date(today.getFullYear(), mi, day);
+      if (d < today) d.setFullYear(d.getFullYear() + 1); // wrap to next year if past
+      return d;
+    }
+  }
+  const md = clean.match(mdRe);
+  if (md) {
+    const mi = monthIdx(md[1]), day = parseInt(md[2]);
+    if (mi !== -1 && day >= 1 && day <= 31) {
+      const d = new Date(today.getFullYear(), mi, day);
+      if (d < today) d.setFullYear(d.getFullYear() + 1);
+      return d;
+    }
+  }
+
+  // ── Chrono fallback for relative phrases ("in 2 hours", "tomorrow morning", etc.) ──
   if (!window.chrono) return null;
   const results = chrono.parse(s.trim(), now, { forwardDate: true });
   return results.length ? results[0].start.date() : null;
