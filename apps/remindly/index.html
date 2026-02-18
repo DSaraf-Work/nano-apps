@@ -1881,7 +1881,9 @@ async function saveReminder() {
   if (!title) { showToast('Please enter a title', 'red'); document.getElementById('inputTitle').focus(); return; }
   if (!date || !time) { showToast('Please set a date and time', 'red'); return; }
 
-  const nextFireAt = new Date(`${date}T${time}`).getTime();
+  // iOS Safari requires HH:MM:SS — append :00 if only HH:MM provided
+  const timeWithSec = /^\d{2}:\d{2}$/.test(time) ? time + ':00' : time;
+  const nextFireAt = new Date(`${date}T${timeWithSec}`).getTime();
   if (isNaN(nextFireAt)) { showToast('Invalid date/time', 'red'); return; }
 
   let intervalMs = 0;
@@ -2413,7 +2415,9 @@ function stopVoice() {
 // ── Voice save helper ─────────────────────────────────────────────────
 // Saves a reminder and returns it (so we can open the edit modal after).
 async function autoSaveReminder(title, dateStr, timeStr) {
-  const nextFireAt = new Date(`${dateStr}T${timeStr}`).getTime();
+  // iOS Safari requires HH:MM:SS — append :00 if only HH:MM provided
+  const timeWithSec = timeStr && /^\d{2}:\d{2}$/.test(timeStr) ? timeStr + ':00' : timeStr;
+  const nextFireAt = new Date(`${dateStr}T${timeWithSec}`).getTime();
   if (isNaN(nextFireAt)) return null;
 
   const reminder = {
