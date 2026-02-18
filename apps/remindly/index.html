@@ -2119,16 +2119,35 @@ function initVoice() {
   };
 
   recognition.onerror = e => {
-    if (e.error === 'not-allowed') showToast('Microphone permission denied', 'red');
-    else if (e.error !== 'aborted') showToast('Voice error: ' + e.error, 'red');
-    shouldBeRecording = false;
-    stopVoice();
+    if (e.error === 'not-allowed') {
+      showToast('Microphone permission denied', 'red');
+      shouldBeRecording = false;
+      stopVoice();
+    } else if (e.error === 'audio-capture') {
+      // Mic hardware not released yet — retry after a delay
+      voiceActive = false;
+      if (shouldBeRecording) {
+        setTimeout(() => {
+          if (shouldBeRecording) {
+            try { recognition.start(); voiceActive = true; } catch(ex) { shouldBeRecording = false; stopVoice(); showToast('Mic unavailable', 'red'); }
+          }
+        }, 800);
+      }
+    } else if (e.error !== 'aborted' && e.error !== 'no-speech') {
+      showToast('Voice error: ' + e.error, 'red');
+      shouldBeRecording = false;
+      stopVoice();
+    }
   };
 
-  // Fix 2: restart loop — keeps recognition alive on iOS/background
+  // Restart loop — keeps recognition alive on iOS/background; delay lets mic hardware release
   recognition.onend = () => {
     if (voiceActive && shouldBeRecording) {
-      try { recognition.start(); } catch(e) { stopVoice(); }
+      setTimeout(() => {
+        if (shouldBeRecording) {
+          try { recognition.start(); } catch(e) { stopVoice(); }
+        }
+      }, 250);
     }
   };
 
