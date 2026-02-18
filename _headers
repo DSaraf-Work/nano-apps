@@ -11,6 +11,10 @@
   Content-Type: application/javascript; charset=utf-8
   Service-Worker-Allowed: /
 
+# Allow Leaflet tiles to be fetched cross-origin (needed for map caching)
+/apps/parkpin/*
+  Access-Control-Allow-Origin: *
+
 /apps/*/manifest.json
   Content-Type: application/manifest+json; charset=utf-8
   Cache-Control: public, max-age=3600
