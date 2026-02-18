@@ -251,6 +251,11 @@ button, .app-card, .tag, .hero-badge, .footer {
     });
 </script>
 
+<div id="swUpdateBar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#1e2535;border-top:1px solid rgba(245,158,11,0.3);padding:12px 20px;align-items:center;justify-content:space-between;z-index:999;gap:12px;">
+  <span style="font-size:13px;color:#e8dcc8;">✨ App updated</span>
+  <button onclick="window.location.reload()" style="background:#f59e0b;color:#080c18;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;">Reload</button>
+</div>
+
 <div class="footer">
   Built with ☕ · All apps are free, open source, and run entirely in your browser
 </div>
@@ -258,6 +263,11 @@ button, .app-card, .tag, .hero-badge, .footer {
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+    // Show update banner when a new SW version takes over (controllerchange fires
+    // only on real app updates, not on every page load)
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      document.getElementById('swUpdateBar').style.display = 'flex';
+    });
   }
   document.addEventListener('contextmenu', e => e.preventDefault());
 </script>

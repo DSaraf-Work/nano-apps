@@ -1,13 +1,11 @@
-const CACHE = 'nano-apps-v1';
+const CACHE = 'nano-apps-v2';
 
-// ── Install: precache shell + dynamically discover every app manifest ──────
+// ── Install: precache only the app registry + manifests (not index.html)
+// index.html is served via stale-while-revalidate on fetch — never pre-cached.
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(async cache => {
-      // Always cache the page shell and the registry
-      await cache.addAll(['./', './index.html', './apps/index.json']);
-
-      // Discover app manifests at install time so they're ready immediately
+      await cache.add('./apps/index.json');
       try {
         const res  = await fetch('./apps/index.json');
         const apps = await res.json();
@@ -20,13 +18,13 @@ self.addEventListener('install', e => {
   self.skipWaiting();
 });
 
-// ── Activate: drop any old cache versions ───────────────────────────────────
+// ── Activate: drop old caches, claim clients immediately ────────────────────
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => clients.claim())
   );
-  clients.claim();
 });
 
 // ── Fetch ────────────────────────────────────────────────────────────────────
@@ -35,36 +33,42 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return; // ignore fonts/CDN
 
-  // Stale-while-revalidate for the shell and registry:
-  // → serve from cache instantly, refresh in background.
-  // New apps added to index.json will appear on the *next* visit.
-  if (
-    url.pathname === '/'          ||
-    url.pathname === '/index.html'||
-    url.pathname === '/apps/index.json'
-  ) {
+  // HTML navigation: stale-while-revalidate.
+  // Serve cached shell instantly for fast load; fetch fresh in background.
+  // On next load the updated content is served from cache.
+  if (e.request.mode === 'navigate') {
+    e.respondWith(swrNavigate(e.request));
+    return;
+  }
+
+  // App registry: SWR so new apps appear quickly
+  if (url.pathname === '/apps/index.json') {
     e.respondWith(staleWhileRevalidate(e.request));
     return;
   }
 
-  // Cache-first for app manifests (stable; updated via the registry refresh above)
+  // App manifests: cache-first (stable)
   if (url.pathname.endsWith('/manifest.json')) {
     e.respondWith(cacheFirst(e.request));
     return;
   }
 
-  // Everything else: network only (no pollution of the cache)
+  // Everything else: network only (no cache pollution)
 });
+
+// SWR for HTML: serve cached instantly, refresh cache in background silently.
+async function swrNavigate(req) {
+  const cache  = await caches.open(CACHE);
+  const cached = await cache.match(req);
+  fetch(req).then(res => { if (res.ok) cache.put(req, res.clone()); }).catch(() => {});
+  return cached ?? fetch(req); // first visit: wait for network
+}
 
 async function staleWhileRevalidate(req) {
   const cache  = await caches.open(CACHE);
   const cached = await cache.match(req);
-  // Kick off a background refresh regardless
-  const fresh  = fetch(req).then(res => {
-    if (res.ok) cache.put(req, res.clone());
-    return res;
-  }).catch(() => null);
-  return cached ?? await fresh; // serve cache instantly if available
+  fetch(req).then(res => { if (res.ok) cache.put(req, res.clone()); }).catch(() => {});
+  return cached ?? fetch(req);
 }
 
 async function cacheFirst(req) {

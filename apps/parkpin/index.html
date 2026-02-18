@@ -2144,7 +2144,16 @@
   // ── Service Worker (PWA) ──
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+    // Show update banner when a new SW version takes over
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      document.getElementById('swUpdateBar').style.display = 'flex';
+    });
   }
 </script>
+
+<div id="swUpdateBar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#1a2030;border-top:1px solid rgba(52,216,122,0.25);padding:12px 20px;align-items:center;justify-content:space-between;z-index:9999;gap:12px;">
+  <span style="font-size:13px;color:#f0f1f5;font-family:'DM Sans',sans-serif;">✨ App updated</span>
+  <button onclick="window.location.reload()" style="background:#34d87a;color:#111318;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;">Reload</button>
+</div>
 </body>
 </html>

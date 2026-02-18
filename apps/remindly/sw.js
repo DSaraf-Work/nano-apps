@@ -1,5 +1,5 @@
-const CACHE_NAME = 'remindly-v4';
-// Only cache the manifest — never cache index.html so iOS always gets the latest code.
+const CACHE_NAME = 'remindly-v5';
+// Only precache the manifest. index.html is served via SWR — never pre-cached.
 const ASSETS = ['/manifest.json'];
 
 // ─── Install & Cache ───────────────────────────────────────────────────────────
@@ -17,21 +17,29 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Navigation requests (HTML page loads): always network-first.
-  // This ensures iOS Safari always gets the latest index.html even when the
-  // service worker has a cached copy — critical for ?reminder= URL param intake.
+  if (e.request.method !== 'GET') return;
+
+  // HTML navigation: stale-while-revalidate.
+  // Serve cached version instantly (fast load on repeat visits),
+  // fetch fresh in background and update cache silently.
+  // First visit (no cache) waits for network — same as before.
   if (e.request.mode === 'navigate') {
-    e.respondWith(
-      fetch(e.request)
-        .catch(() => caches.match(e.request).then(r => r || caches.match('/')))
-    );
+    e.respondWith(swrNavigate(e.request));
     return;
   }
-  // Static assets (JS, CSS, images, manifest): cache-first for speed.
+
+  // Static assets (manifest, icons): cache-first for speed.
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request)).catch(() => {})
   );
 });
+
+async function swrNavigate(req) {
+  const cache  = await caches.open(CACHE_NAME);
+  const cached = await cache.match(req);
+  fetch(req).then(res => { if (res.ok) cache.put(req, res.clone()); }).catch(() => {});
+  return cached ?? fetch(req); // first visit: wait for network
+}
 
 // ─── IndexedDB helpers ─────────────────────────────────────────────────────────
 function openDB() {
