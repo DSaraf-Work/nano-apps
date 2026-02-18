@@ -1377,11 +1377,15 @@ let scheduledTimers = {};
     // Clean the URL immediately so a refresh doesn't re-trigger
     history.replaceState(null, '', location.pathname);
     const text = inboundText.trim(); // URLSearchParams already decodes — no need for decodeURIComponent
+    console.log('[remindly] URL intake received:', JSON.stringify(text));
     showToast('⏳ Processing: ' + text.slice(0, 40) + (text.length > 40 ? '…' : ''), 'amber');
     // Call _processVoiceInputInner directly — bypass voice state entirely
     setTimeout(async () => {
-      try { await _processVoiceInputInner(text); }
-      catch (err) { showToast('Error: ' + err.message, 'red'); }
+      try { await _processVoiceInputInner(text, { fromUrl: true }); }
+      catch (err) {
+        console.error('[remindly] URL intake error:', err);
+        showToast('Error: ' + err.message, 'red');
+      }
     }, 500);
   }
 })();
@@ -2431,10 +2435,12 @@ async function processVoiceInput(transcript) {
   try { await _processVoiceInputInner(transcript); } catch(err) { showToast('Voice error: ' + err.message, 'red'); console.error('[voice]', err); }
 }
 
-async function _processVoiceInputInner(transcript) {
+async function _processVoiceInputInner(transcript, { fromUrl = false } = {}) {
 
   const words = transcript.trim().split(/\s+/);
-  if (words.length <= 4) {
+  console.log('[remindly] _processVoiceInputInner:', JSON.stringify(transcript), { fromUrl });
+  // Skip noise-filter for URL intake — short phrases like "Clean desk at 11pm" are valid
+  if (!fromUrl && words.length <= 4) {
     showToast('Too short — speak a full reminder', 'amber');
     return;
   }
