@@ -454,7 +454,7 @@
     background: rgba(0,0,0,0.6);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
-    z-index: 3000;
+    z-index: 3500;
     display: none;
     align-items: center;
     justify-content: center;
@@ -622,6 +622,28 @@
     cursor: pointer;
     font-family: 'DM Sans', sans-serif;
     text-align: center;
+  }
+
+  .h-delete {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: rgba(255,92,92,0.1);
+    border: none;
+    color: var(--danger);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .h-delete:active { transform: scale(0.9); background: rgba(255,92,92,0.2); }
+
+  .h-photo {
+    width: 36px; height: 36px;
+    border-radius: 6px;
+    object-fit: cover;
+    border: 1px solid rgba(255,255,255,0.1);
+    flex-shrink: 0;
   }
 
   /* ── Settings Sheet ── */
@@ -1219,6 +1241,8 @@
     applySettings();
     // Persist defaults so they survive reload
     safeSave('parkpin_settings', settings);
+    // Prune entries older than 6 months
+    pruneOldHistory();
 
     if ('geolocation' in navigator) {
       watchId = navigator.geolocation.watchPosition(onPosition, onError,
@@ -1261,7 +1285,7 @@
     routeLine = null;
 
     // Clear old photo from separate storage
-    localStorage.removeItem('parkpin_photo');
+    // (old photos are now per-session and managed by pruneHistoryPhotos)
 
     // Reset file input to prevent stale data
     const photoInput = document.getElementById('photoInput');
@@ -1275,7 +1299,7 @@
       parkedAt: new Date().toISOString(),  // auto log park-in time
       clearedAt: null,                      // will be set on clear
       note: '',
-      photo: false,  // boolean flag, actual photo stored separately
+      photoKey: null,  // will be 'parkpin_photo_{time}' if photo taken
       address: null,
       timer: null
     };
@@ -1341,11 +1365,12 @@
       const entry = {
         ...parkedData,
         clearedAt: new Date().toISOString(),
-        duration: now - parkedData.time,
-        photo: false
+        duration: now - parkedData.time
+        // photoKey is preserved for history viewing
       };
       parkHistory.unshift(entry);
       if (parkHistory.length > 50) parkHistory = parkHistory.slice(0, 50);
+      pruneHistoryPhotos();  // keep only last 5 photos
       safeSave('parkpin_history', parkHistory);
       updateHistoryBadge();
     }
@@ -1354,7 +1379,7 @@
     if (routeLine) map.removeLayer(routeLine);
     parkMarker = null; routeLine = null; parkedData = null;
     localStorage.removeItem('parkpin_data');
-    localStorage.removeItem('parkpin_photo');
+    // Don't delete photo — it's now referenced by history
     clearTimer();
     showDefaultState();
     toast("Parking cleared & saved to history");
@@ -1492,17 +1517,16 @@
     const area = document.getElementById('photoArea');
     if (!parkedData) { area.innerHTML = ''; return; }
 
-    // Photos stored separately to avoid quota issues
-    const photo = localStorage.getItem('parkpin_photo');
-    if (photo && parkedData.photo) {
+    const photoKey = parkedData.photoKey;
+    const photo = photoKey ? localStorage.getItem(photoKey) : null;
+    if (photo) {
       area.innerHTML = `
         <div class="photo-row">
           <img class="photo-thumb" src="${photo}" onclick="viewPhoto()" alt="Parking spot" />
           <div class="photo-add-btn" onclick="triggerPhoto()">+</div>
         </div>`;
     } else {
-      // No photo yet - clear any stale state
-      parkedData.photo = false;
+      parkedData.photoKey = null;
       area.innerHTML = '';
     }
   }
@@ -1531,10 +1555,11 @@
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         const compressed = canvas.toDataURL('image/jpeg', 0.5);
 
-        // Store photo in separate key to avoid corrupting parkedData
+        // Store photo with per-session key
         try {
-          localStorage.setItem('parkpin_photo', compressed);
-          parkedData.photo = true;  // just a flag
+          const photoKey = 'parkpin_photo_' + parkedData.time;
+          localStorage.setItem(photoKey, compressed);
+          parkedData.photoKey = photoKey;
           safeSave('parkpin_data', parkedData);
           renderPhotoArea();
           toast('Photo saved');
@@ -1550,7 +1575,8 @@
   }
 
   function viewPhoto() {
-    const photo = localStorage.getItem('parkpin_photo');
+    if (!parkedData || !parkedData.photoKey) return;
+    const photo = localStorage.getItem(parkedData.photoKey);
     if (!photo) return;
     document.getElementById('photoViewerImg').src = photo;
     document.getElementById('photoViewer').classList.add('visible');
@@ -1760,9 +1786,19 @@
       const addressHtml = item.address ? escHtml(item.address) : `${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`;
       const timeRange = outTime ? `🅿️ ${inTime} → ${outTime}` : `🅿️ ${inTime}`;
 
+      // Check if photo exists
+      let photoThumb = '';
+      if (item.photoKey) {
+        try {
+          const p = localStorage.getItem(item.photoKey);
+          if (p) photoThumb = `<img class="h-photo" src="${p}" alt="" />`;
+        } catch(e) {}
+      }
+
       html += `
         <div class="history-item ${isActive ? 'active' : ''}" onclick="showHistoryOnMap(${i})">
           <div class="history-num">${i + 1}</div>
+          ${photoThumb}
           <div class="history-info">
             <div class="h-date">${dateStr}</div>
             <div class="h-detail">${timeRange} · ${addressHtml}</div>
@@ -1772,6 +1808,7 @@
             <strong>${durStr}</strong>
             parked
           </div>
+          <button class="h-delete" onclick="deleteHistoryItem(${i}, event)" title="Delete">✕</button>
         </div>`;
     });
 
@@ -1813,8 +1850,20 @@
     const addr = item.address || `${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`;
     const noteHtml = item.note ? `<div style="margin-top:4px;font-size:12px;color:#4a9eff;">📝 ${escHtml(item.note)}</div>` : '';
 
+    // Load photo if available
+    let photoHtml = '';
+    if (item.photoKey) {
+      try {
+        const photo = localStorage.getItem(item.photoKey);
+        if (photo) {
+          photoHtml = `<img src="${photo}" style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />`;
+        }
+      } catch(e) {}
+    }
+
     marker.bindPopup(`
-      <div style="font-family:'DM Sans',sans-serif;min-width:180px;">
+      <div style="font-family:'DM Sans',sans-serif;min-width:180px;max-width:220px;">
+        ${photoHtml}
         <div style="font-weight:700;font-size:14px;margin-bottom:4px;">Past Parking</div>
         <div style="font-size:12px;color:#666;">${dateStr} · ${inTime}${outTime}</div>
         <div style="font-size:12px;color:#666;">Duration: ${durStr}</div>
@@ -1828,7 +1877,7 @@
           </a>
         </div>
       </div>
-    `, { closeButton: true, className: '' }).openPopup();
+    `, { closeButton: true, className: '', maxWidth: 250 }).openPopup();
 
     // Remove after 30 seconds instead of 10
     setTimeout(() => {
@@ -1838,9 +1887,15 @@
 
   function clearAllHistory() {
     document.getElementById('confirmTitle').textContent = 'Clear All History?';
-    document.getElementById('confirmMsg').textContent = 'This will permanently remove all parking history.';
+    document.getElementById('confirmMsg').textContent = 'This will permanently remove all parking history and photos.';
     document.getElementById('confirmAction').textContent = 'Yes, Clear All';
     document.getElementById('confirmAction').onclick = function() {
+      // Clean up all photo keys
+      parkHistory.forEach(item => {
+        if (item.photoKey) {
+          try { localStorage.removeItem(item.photoKey); } catch(e) {}
+        }
+      });
       parkHistory = [];
       localStorage.removeItem('parkpin_history');
       closeConfirm();
@@ -1849,6 +1904,53 @@
       toast('History cleared');
     };
     document.getElementById('confirmDialog').classList.add('visible');
+  }
+
+  function deleteHistoryItem(index, event) {
+    if (event) event.stopPropagation();  // don't trigger map fly
+    const item = parkHistory[index];
+    if (!item) return;
+    // Clean up photo
+    if (item.photoKey) {
+      try { localStorage.removeItem(item.photoKey); } catch(e) {}
+    }
+    parkHistory.splice(index, 1);
+    safeSave('parkpin_history', parkHistory);
+    renderHistory();
+    updateHistoryBadge();
+    toast('Entry deleted');
+  }
+
+  // Keep only the 5 most recent photos in history to save space
+  function pruneHistoryPhotos() {
+    let photoCount = 0;
+    parkHistory.forEach(item => {
+      if (item.photoKey) {
+        photoCount++;
+        if (photoCount > 5) {
+          try { localStorage.removeItem(item.photoKey); } catch(e) {}
+          item.photoKey = null;
+        }
+      }
+    });
+  }
+
+  // TTL: Remove entries older than 6 months on load
+  function pruneOldHistory() {
+    const sixMonthsMs = 6 * 30 * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - sixMonthsMs;
+    const before = parkHistory.length;
+    parkHistory = parkHistory.filter(item => {
+      if (item.time >= cutoff) return true;
+      // Clean up old photo
+      if (item.photoKey) {
+        try { localStorage.removeItem(item.photoKey); } catch(e) {}
+      }
+      return false;
+    });
+    if (parkHistory.length < before) {
+      safeSave('parkpin_history', parkHistory);
+    }
   }
 
   function updateHistoryBadge() {
