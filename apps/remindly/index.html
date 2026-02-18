@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Remindly"/>
@@ -43,7 +43,18 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  touch-action: pan-y;
+}
+
+html {
+  scroll-behavior: smooth;
+}
 
 html, body {
   height: 100%;
@@ -59,6 +70,8 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
   background-image:
     radial-gradient(ellipse 60% 40% at 50% -10%, rgba(245,158,11,0.08) 0%, transparent 70%),
     radial-gradient(ellipse 40% 30% at 90% 80%, rgba(96,165,250,0.04) 0%, transparent 60%);
@@ -957,6 +970,12 @@ input:checked + .toggle-slider:before { transform: translateX(18px); background:
 @media (max-width: 360px) {
   .summary-bar { grid-template-columns: repeat(3, 1fr); }
   .summary-num { font-size: 22px; }
+}
+
+/* Prevent text selection on UI elements */
+button, .header, .tab-bar, .badge, .filter-chip, .fab {
+  -webkit-user-select: none;
+  user-select: none;
 }
 </style>
 </head>
@@ -2359,6 +2378,8 @@ const urlParams = new URLSearchParams(location.search);
 if (urlParams.get('action') === 'add') {
   setTimeout(openAddModal, 500);
 }
+
+document.addEventListener('contextmenu', e => e.preventDefault());
 </script>
 </body>
 </html>
