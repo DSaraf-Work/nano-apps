@@ -2421,7 +2421,7 @@ async function autoSaveReminder(title, dateStr, timeStr) {
 // ── Core parser ───────────────────────────────────────────────────────
 // Always auto-saves if transcript > 4 words, then opens edit modal.
 async function processVoiceInput(transcript) {
-  stopVoice();
+  if (shouldBeRecording) stopVoice();
   if (!transcript) return;
   try { await _processVoiceInputInner(transcript); } catch(err) { showToast('Voice error: ' + err.message, 'red'); console.error('[voice]', err); }
 }
