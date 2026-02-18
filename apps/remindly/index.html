@@ -1136,7 +1136,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); background:
           font-size: 11px;
           color: var(--text-muted);
           margin-top: 4px;
-        ">Try: "remind me to call John tomorrow at 3pm"</div>
+        ">Try: "Remind to call John at 3pm IST on tomorrow"</div>
       </div>
       <div class="form-group">
         <label class="form-label">Description</label>
@@ -1901,25 +1901,89 @@ function showToast(msg, type = 'amber') {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// VOICE INPUT
+// VOICE INPUT — Pattern Registry
+// ─────────────────────────────────────────────────────────────────
+// To add a new pattern:
+//   1. Add an entry to VOICE_PATTERNS below
+//   2. Set regex with named capture groups: title, time, date
+//      (omit groups you don't need — each is optional)
+// Patterns are tried top-to-bottom; first match wins.
 // ═══════════════════════════════════════════════════════════════════
-let recognition = null;
-let voiceActive = false;
-let silenceTimer = null;
+
+const VOICE_PATTERNS = [
+  {
+    // "Remind to call John at 3pm IST on tomorrow"
+    // "Remind me to take medicine at 9:30am on Friday"
+    name: 'remind-to · at TIME · on DATE',
+    regex: /^remind(?:\s+me)?\s+to\s+(?<title>.+?)\s+at\s+(?<time>[\d]{1,2}(?::\d{2})?\s*[ap]m(?:\s+ist)?)\s+on\s+(?<date>.+?)\s*$/i,
+  },
+  {
+    // "Remind to pay bill at 5pm tomorrow"
+    // "Remind to call mom at 8am today"
+    name: 'remind-to · at TIME · today/tomorrow',
+    regex: /^remind(?:\s+me)?\s+to\s+(?<title>.+?)\s+at\s+(?<time>[\d]{1,2}(?::\d{2})?\s*[ap]m(?:\s+ist)?)\s+(?<date>today|tomorrow)\s*$/i,
+  },
+  {
+    // "Remind to pay bill tomorrow at 5pm"
+    name: 'remind-to · today/tomorrow · at TIME',
+    regex: /^remind(?:\s+me)?\s+to\s+(?<title>.+?)\s+(?<date>today|tomorrow)\s+at\s+(?<time>[\d]{1,2}(?::\d{2})?\s*[ap]m(?:\s+ist)?)\s*$/i,
+  },
+];
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+// Parses "3pm", "3:30pm", "3:30 PM", "3pm IST", "3:30 pm IST" → "HH:MM"
+function parseTimeStr(s) {
+  const clean = s.replace(/\s*ist\s*/gi, '').trim();
+  const m = clean.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+  if (!m) return null;
+  let h = +m[1], min = +(m[2] || 0);
+  const ap = m[3].toLowerCase();
+  if (ap === 'pm' && h !== 12) h += 12;
+  if (ap === 'am' && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+// Parses "tomorrow", "Friday", "25 March" → Date object via chrono
+function parseDateStr(s) {
+  if (!window.chrono) return null;
+  const results = chrono.parse(s.trim(), new Date(), { forwardDate: true });
+  return results.length ? results[0].start.date() : null;
+}
+
+// Try each pattern in order, return extracted fields or null
+function matchVoicePattern(transcript) {
+  for (const p of VOICE_PATTERNS) {
+    const m = transcript.match(p.regex);
+    if (m && m.groups) {
+      return {
+        patternName: p.name,
+        title:   (m.groups.title  || '').trim(),
+        timeStr: (m.groups.time   || '').trim(),
+        dateStr: (m.groups.date   || '').trim(),
+      };
+    }
+  }
+  return null;
+}
+
+// ── Speech Recognition state ─────────────────────────────────────────
+let recognition   = null;
+let voiceActive   = false;
+let silenceTimer  = null;
 let finalTranscript = '';
 
 function initVoice() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
     const btn = document.getElementById('micBtn');
     if (btn) btn.style.display = 'none';
     return false;
   }
-
-  recognition = new SpeechRecognition();
-  recognition.continuous = true;
+  recognition = new SR();
+  recognition.continuous     = true;
   recognition.interimResults = true;
-  recognition.lang = 'en-US';
+  recognition.lang           = 'en-US';
   recognition.maxAlternatives = 1;
 
   recognition.onresult = e => {
@@ -1929,9 +1993,8 @@ function initVoice() {
       if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
       else interim += e.results[i][0].transcript;
     }
-    const display = finalTranscript || interim;
     const transcriptEl = document.getElementById('voiceTranscript');
-    if (transcriptEl) transcriptEl.textContent = display;
+    if (transcriptEl) transcriptEl.textContent = finalTranscript || interim;
 
     clearTimeout(silenceTimer);
     if (finalTranscript) {
@@ -1946,9 +2009,7 @@ function initVoice() {
   };
 
   recognition.onend = () => {
-    if (voiceActive) {
-      try { recognition.start(); } catch(e) { stopVoice(); }
-    }
+    if (voiceActive) try { recognition.start(); } catch(e) { stopVoice(); }
   };
 
   return true;
@@ -1964,17 +2025,14 @@ function toggleVoice() {
 }
 
 function startVoice() {
-  if (!recognition && !initVoice()) {
-    showToast('Voice not supported on this browser', 'red');
-    return;
-  }
+  if (!recognition && !initVoice()) { showToast('Voice not supported on this browser', 'red'); return; }
   finalTranscript = '';
   const transcriptEl = document.getElementById('voiceTranscript');
   const hintEl = document.getElementById('voiceHint');
-  const btn = document.getElementById('micBtn');
-  if (transcriptEl) { transcriptEl.style.display = 'block'; transcriptEl.textContent = ''; }
+  const btn    = document.getElementById('micBtn');
+  if (transcriptEl) { transcriptEl.style.display = 'block'; transcriptEl.textContent = ''; transcriptEl.style.fontStyle = 'italic'; }
   if (hintEl) hintEl.style.display = 'block';
-  if (btn) { btn.classList.add('recording'); btn.classList.remove('success'); btn.title = 'Tap to stop'; }
+  if (btn)    { btn.classList.add('recording'); btn.classList.remove('success'); btn.title = 'Tap to stop'; }
   voiceActive = true;
   try { recognition.start(); } catch(e) {}
 }
@@ -1987,81 +2045,79 @@ function stopVoice() {
   try { recognition.stop(); } catch(e) {}
 }
 
+// ── Core parser ───────────────────────────────────────────────────────
 function processVoiceInput(transcript) {
   stopVoice();
   if (!transcript) return;
 
-  const btn = document.getElementById('micBtn');
+  const transcriptEl = document.getElementById('voiceTranscript');
   const hintEl = document.getElementById('voiceHint');
+  const btn    = document.getElementById('micBtn');
 
-  let cleaned = transcript
-    .replace(/^(remind me to|remind me|remember to|set a reminder to|set reminder to|hey|ok|okay)\s+/i, '')
-    .replace(/^(a |an |the )/i, '')
-    .trim();
+  const match = matchVoicePattern(transcript);
 
-  let parsedDate = null;
-  let titleText = cleaned;
-
-  if (window.chrono) {
-    const results = chrono.parse(cleaned, new Date(), { forwardDate: true });
-    if (results.length > 0) {
-      parsedDate = results[0].start.date();
-      const matchedText = results[0].text;
-      titleText = cleaned
-        .replace(matchedText, '')
-        .replace(/\s+(at|on|by|in|for)\s*$/i, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+  if (!match) {
+    // No pattern matched — put full text in title, let user fix date/time
+    document.getElementById('inputTitle').value =
+      transcript.charAt(0).toUpperCase() + transcript.slice(1);
+    if (transcriptEl) {
+      transcriptEl.style.fontStyle = 'normal';
+      transcriptEl.innerHTML = `⚠️ Pattern not recognised — title filled, set date &amp; time manually.`;
     }
+    if (hintEl) hintEl.style.display = 'none';
+    showToast('Pattern not recognised — set date/time manually', 'amber');
+    return;
   }
 
-  if (titleText) titleText = titleText.charAt(0).toUpperCase() + titleText.slice(1);
+  // ── Fill title ────────────────────────────────────────────────────
+  const title = match.title.charAt(0).toUpperCase() + match.title.slice(1);
+  document.getElementById('inputTitle').value = title;
 
-  const titleInput = document.getElementById('inputTitle');
-  if (titleInput && titleText) titleInput.value = titleText;
+  // ── Fill time ─────────────────────────────────────────────────────
+  const timeVal = parseTimeStr(match.timeStr);
+  if (timeVal) document.getElementById('inputTime').value = timeVal;
 
-  if (parsedDate) {
-    const dateStr = parsedDate.toISOString().slice(0, 10);
-    const timeStr = parsedDate.toTimeString().slice(0, 5);
-    const dateInput = document.getElementById('inputDate');
-    const timeInput = document.getElementById('inputTime');
-    if (dateInput) dateInput.value = dateStr;
-    if (timeInput) timeInput.value = timeStr;
+  // ── Fill date ─────────────────────────────────────────────────────
+  const dateObj = parseDateStr(match.dateStr);
+  if (dateObj) {
+    document.getElementById('inputDate').value = dateObj.toISOString().slice(0, 10);
   }
 
+  // ── Feedback ──────────────────────────────────────────────────────
   if (btn) {
     btn.classList.add('success');
     btn.textContent = '✓';
     setTimeout(() => { btn.textContent = '🎤'; btn.classList.remove('success'); }, 2000);
   }
 
-  const transcriptEl = document.getElementById('voiceTranscript');
+  const datePart = dateObj
+    ? dateObj.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
+    : match.dateStr || '?';
+
   if (transcriptEl) {
     transcriptEl.style.fontStyle = 'normal';
-    const timeInfo = parsedDate
-      ? ` · 🕐 ${parsedDate.toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'})} ${parsedDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`
-      : ' · ⚠️ No time detected — set manually';
-    transcriptEl.innerHTML = `<span style="color:var(--green)">✓</span> "${escHtml(transcript)}"${timeInfo}`;
+    transcriptEl.innerHTML =
+      `<span style="color:var(--green)">✓</span> ${escHtml(title)}<br>` +
+      `<small style="color:var(--text-muted)">🕐 ${timeVal || match.timeStr} &nbsp;·&nbsp; 📅 ${datePart}</small>`;
   }
   if (hintEl) hintEl.style.display = 'none';
 
+  const ok = timeVal && dateObj;
+  showToast(ok ? '✅ Reminder parsed!' : '⚠️ Partial match — check fields', ok ? 'green' : 'amber');
   setTimeout(() => document.getElementById('inputDesc')?.focus(), 100);
-
-  if (!parsedDate) showToast('No time detected — please set manually', 'amber');
-  else showToast('✅ Reminder parsed from voice!', 'green');
 }
 
-// Reset voice UI when modal closes
+// ── Reset voice UI when modal closes ─────────────────────────────────
 const _origCloseModal = closeModal;
 closeModal = function() {
   stopVoice();
   finalTranscript = '';
   const transcriptEl = document.getElementById('voiceTranscript');
   const hintEl = document.getElementById('voiceHint');
-  const btn = document.getElementById('micBtn');
+  const btn    = document.getElementById('micBtn');
   if (transcriptEl) { transcriptEl.style.display = 'none'; transcriptEl.textContent = ''; transcriptEl.style.fontStyle = 'italic'; }
   if (hintEl) hintEl.style.display = 'none';
-  if (btn) { btn.textContent = '🎤'; btn.classList.remove('recording', 'success'); }
+  if (btn)    { btn.textContent = '🎤'; btn.classList.remove('recording', 'success'); }
   _origCloseModal();
 };
 
