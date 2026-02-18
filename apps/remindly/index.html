@@ -2202,10 +2202,35 @@ function toggleFloatingVoice() {
   }
 }
 
-function startVoice() {
+let micPermissionGranted = false;
+
+async function ensureMicPermission() {
+  if (micPermissionGranted) return true;
+  // Check Permissions API first — avoids redundant getUserMedia if already granted
+  if (navigator.permissions) {
+    try {
+      const perm = await navigator.permissions.query({ name: 'microphone' });
+      if (perm.state === 'granted') { micPermissionGranted = true; return true; }
+      if (perm.state === 'denied') { showToast('Microphone permission denied', 'red'); return false; }
+    } catch(e) {} // some browsers don't expose mic permission query
+  }
+  // Explicitly request via getUserMedia — browser persists the grant across sessions
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(t => t.stop()); // release hardware immediately
+    micPermissionGranted = true;
+    return true;
+  } catch(e) {
+    showToast('Microphone permission denied', 'red');
+    return false;
+  }
+}
+
+async function startVoice() {
   if (!recognition && !initVoice()) { showToast('Voice not supported on this browser', 'red'); return; }
+  if (!(await ensureMicPermission())) return;
   finalTranscript = '';
-  shouldBeRecording = true;  // Fix 2: record user intent
+  shouldBeRecording = true;
   const transcriptEl = document.getElementById('voiceTranscript');
   const hintEl = document.getElementById('voiceHint');
   if (transcriptEl) { transcriptEl.style.display = 'block'; transcriptEl.textContent = ''; transcriptEl.style.fontStyle = 'italic'; }
