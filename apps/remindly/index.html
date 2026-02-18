@@ -456,6 +456,43 @@ body {
 .fab:hover { transform: scale(1.08) rotate(5deg); box-shadow: 0 12px 40px rgba(245,158,11,0.5); }
 .fab:active { transform: scale(0.94); }
 
+/* ── Floating Mic FAB ────────────────────────────────────────────────── */
+.fab-mic {
+  position: fixed;
+  bottom: calc(88px + var(--safe-bottom));
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  transition: all 0.2s;
+}
+
+.fab-mic:hover { background: var(--surface3); border-color: var(--border2); color: var(--text); }
+.fab-mic:active { transform: scale(0.92); }
+
+.fab-mic.recording {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+  animation: micPulse 1s ease-in-out infinite;
+}
+
+.fab-mic.success {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #10b981;
+}
+
 /* ── Modal ───────────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
@@ -1089,6 +1126,9 @@ input:checked + .toggle-slider:before { transform: translateX(18px); background:
 
 <!-- FAB -->
 <button class="fab" id="fab" onclick="openAddModal()">+</button>
+
+<!-- Floating Mic FAB (main screen, auto-saves on success) -->
+<button class="fab-mic" id="fabMicBtn" onclick="toggleFloatingVoice()" title="Speak a reminder">🎤</button>
 
 <!-- Add/Edit Reminder Modal -->
 <div class="modal-overlay" id="addModal" onclick="closeModalOnOverlay(event)">
@@ -2020,22 +2060,26 @@ function matchVoicePattern(transcript) {
 }
 
 // ── Speech Recognition state ─────────────────────────────────────────
-let recognition   = null;
-let voiceActive   = false;
-let silenceTimer  = null;
-let finalTranscript = '';
+let recognition      = null;
+let voiceActive      = false;
+let shouldBeRecording = false;  // Fix 2: tracks user intent (pressed start, not yet pressed stop)
+let silenceTimer     = null;
+let finalTranscript  = '';
+let voiceAutoSave    = false;   // Fix 3: true when triggered from floating mic (auto-save mode)
 
 function initVoice() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
     const btn = document.getElementById('micBtn');
     if (btn) btn.style.display = 'none';
+    const fabMic = document.getElementById('fabMicBtn');
+    if (fabMic) fabMic.style.display = 'none';
     return false;
   }
   recognition = new SR();
-  recognition.continuous     = true;
-  recognition.interimResults = true;
-  recognition.lang           = 'en-US';
+  recognition.continuous      = true;
+  recognition.interimResults  = true;
+  recognition.lang            = 'en-US';
   recognition.maxAlternatives = 1;
 
   recognition.onresult = e => {
@@ -2050,25 +2094,69 @@ function initVoice() {
 
     clearTimeout(silenceTimer);
     if (finalTranscript) {
-      silenceTimer = setTimeout(() => processVoiceInput(finalTranscript.trim()), 1500);
+      // Fix 1: silence timeout changed from 1500ms to 3000ms
+      silenceTimer = setTimeout(() => processVoiceInput(finalTranscript.trim()), 3000);
     }
   };
 
   recognition.onerror = e => {
     if (e.error === 'not-allowed') showToast('Microphone permission denied', 'red');
     else if (e.error !== 'aborted') showToast('Voice error: ' + e.error, 'red');
+    shouldBeRecording = false;
     stopVoice();
   };
 
+  // Fix 2: restart loop — keeps recognition alive on iOS/background
   recognition.onend = () => {
-    if (voiceActive) try { recognition.start(); } catch(e) { stopVoice(); }
+    if (voiceActive && shouldBeRecording) {
+      try { recognition.start(); } catch(e) { stopVoice(); }
+    }
   };
 
   return true;
 }
 
+// Fix 2: visibilitychange listener — restart if tab comes back into view while recording
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && shouldBeRecording && !voiceActive) {
+    try {
+      if (recognition) recognition.start();
+      voiceActive = true;
+      _syncMicButtonState(true);
+    } catch(e) {}
+  }
+});
+
+// Sync both mic buttons (modal + floating) to the same visual state
+function _syncMicButtonState(isRecording) {
+  const modalBtn  = document.getElementById('micBtn');
+  const floatBtn  = document.getElementById('fabMicBtn');
+  if (isRecording) {
+    if (modalBtn)  { modalBtn.classList.add('recording');  modalBtn.classList.remove('success');  modalBtn.title = 'Tap to stop'; }
+    if (floatBtn)  { floatBtn.classList.add('recording');  floatBtn.classList.remove('success');  floatBtn.title = 'Tap to stop'; }
+  } else {
+    if (modalBtn)  { modalBtn.classList.remove('recording', 'success');  modalBtn.title = 'Speak your reminder'; }
+    if (floatBtn)  { floatBtn.classList.remove('recording', 'success');  floatBtn.title = 'Speak a reminder'; }
+  }
+}
+
 function toggleVoice() {
+  // Called from modal mic button — fills form, no auto-save
+  voiceAutoSave = false;
   if (voiceActive) {
+    shouldBeRecording = false;
+    stopVoice();
+    if (finalTranscript.trim()) processVoiceInput(finalTranscript.trim());
+  } else {
+    startVoice();
+  }
+}
+
+// Fix 4: floating mic button handler — auto-save mode
+function toggleFloatingVoice() {
+  voiceAutoSave = true;
+  if (voiceActive) {
+    shouldBeRecording = false;
     stopVoice();
     if (finalTranscript.trim()) processVoiceInput(finalTranscript.trim());
   } else {
@@ -2079,22 +2167,62 @@ function toggleVoice() {
 function startVoice() {
   if (!recognition && !initVoice()) { showToast('Voice not supported on this browser', 'red'); return; }
   finalTranscript = '';
+  shouldBeRecording = true;  // Fix 2: record user intent
   const transcriptEl = document.getElementById('voiceTranscript');
   const hintEl = document.getElementById('voiceHint');
-  const btn    = document.getElementById('micBtn');
   if (transcriptEl) { transcriptEl.style.display = 'block'; transcriptEl.textContent = ''; transcriptEl.style.fontStyle = 'italic'; }
   if (hintEl) hintEl.style.display = 'block';
-  if (btn)    { btn.classList.add('recording'); btn.classList.remove('success'); btn.title = 'Tap to stop'; }
   voiceActive = true;
+  _syncMicButtonState(true);
   try { recognition.start(); } catch(e) {}
 }
 
 function stopVoice() {
   voiceActive = false;
+  shouldBeRecording = false;  // Fix 2: clear intent
   clearTimeout(silenceTimer);
-  const btn = document.getElementById('micBtn');
-  if (btn) { btn.classList.remove('recording'); btn.title = 'Speak your reminder'; }
+  _syncMicButtonState(false);
   try { recognition.stop(); } catch(e) {}
+}
+
+// ── Auto-save helper (Fix 3) ──────────────────────────────────────────
+// Directly saves a reminder object without touching the modal.
+async function autoSaveReminder(title, dateStr, timeStr) {
+  const nextFireAt = new Date(`${dateStr}T${timeStr}`).getTime();
+  if (isNaN(nextFireAt)) return false;
+
+  const reminder = {
+    id: `r_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+    title,
+    description: '',
+    nextFireAt,
+    repeat: 'none',
+    intervalMs: 0,
+    followUps: [],
+    enabled: true,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  await dbPut(reminder);
+  reminders.push(reminder);
+  renderAll();
+  scheduleAll();
+
+  if (Notification.permission !== 'granted') {
+    showToast('Reminder set! Enable notifications to receive alerts', 'amber');
+  } else {
+    const diff = nextFireAt - Date.now();
+    const formatted = diff < 0
+      ? 'past time!'
+      : diff < 3600000
+        ? `in ${Math.round(diff / 60000)} min`
+        : diff < 86400000
+          ? `today at ${new Date(nextFireAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+          : `on ${new Date(nextFireAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+    showToast(`Reminder set for ${formatted}`, 'green');
+  }
+  return true;
 }
 
 // ── Core parser ───────────────────────────────────────────────────────
@@ -2104,12 +2232,18 @@ function processVoiceInput(transcript) {
 
   const transcriptEl = document.getElementById('voiceTranscript');
   const hintEl = document.getElementById('voiceHint');
-  const btn    = document.getElementById('micBtn');
+  const modalBtn = document.getElementById('micBtn');
+  const floatBtn = document.getElementById('fabMicBtn');
 
   const match = matchVoicePattern(transcript);
 
   if (!match) {
-    // No pattern matched — put full text in title, let user fix date/time
+    if (voiceAutoSave) {
+      // Auto-save mode: no pattern — show toast, do nothing else
+      showToast('Pattern not recognised — try: "Call John at 3pm"', 'amber');
+      return;
+    }
+    // Modal mode: put full text in title, let user fix date/time
     document.getElementById('inputTitle').value =
       transcript.charAt(0).toUpperCase() + transcript.slice(1);
     if (transcriptEl) {
@@ -2121,15 +2255,13 @@ function processVoiceInput(transcript) {
     return;
   }
 
-  // ── Fill title ────────────────────────────────────────────────────
+  // ── Resolve title, time, date from match ─────────────────────────
   const title = match.title.charAt(0).toUpperCase() + match.title.slice(1);
-  document.getElementById('inputTitle').value = title;
 
   let timeVal = null;
   let dateObj = null;
 
   if (match.datetimeStr) {
-    // Combined phrase like "tomorrow morning", "tonight" — let chrono parse it whole
     const dt = parseDateStr(match.datetimeStr);
     if (dt) {
       dateObj = dt;
@@ -2138,7 +2270,6 @@ function processVoiceInput(transcript) {
       timeVal = `${h}:${mn}`;
     }
   } else if (match.reltimeStr) {
-    // Relative phrase like "in 2 hours", "in 30 minutes" — chrono resolves to absolute time
     const dt = parseDateStr(match.reltimeStr);
     if (dt) {
       dateObj = dt;
@@ -2147,22 +2278,46 @@ function processVoiceInput(transcript) {
       timeVal = `${h}:${mn}`;
     }
   } else {
-    // ── Fill time ─────────────────────────────────────────────────────
     timeVal = parseTimeStr(match.timeStr);
-    // ── Fill date ─────────────────────────────────────────────────────
     dateObj = parseDateStr(match.dateStr || 'today');
   }
 
-  if (timeVal) document.getElementById('inputTime').value = timeVal;
-  if (dateObj) {
-    document.getElementById('inputDate').value = dateObj.toISOString().slice(0, 10);
+  const allFieldsOk = title && timeVal && dateObj;
+
+  // Fix 3: if floating mic and all fields resolved — auto-save silently
+  if (voiceAutoSave && allFieldsOk) {
+    const dateStr = dateObj.toISOString().slice(0, 10);
+    autoSaveReminder(title, dateStr, timeVal);
+    // Reset floating mic button to success state briefly
+    if (floatBtn) {
+      floatBtn.textContent = '✓';
+      floatBtn.classList.add('success');
+      setTimeout(() => { floatBtn.textContent = '🎤'; floatBtn.classList.remove('success'); }, 2000);
+    }
+    return;
   }
 
-  // ── Feedback ──────────────────────────────────────────────────────
-  if (btn) {
-    btn.classList.add('success');
-    btn.textContent = '✓';
-    setTimeout(() => { btn.textContent = '🎤'; btn.classList.remove('success'); }, 2000);
+  // Fix 3: floating mic, fields incomplete — fall back to opening modal
+  if (voiceAutoSave && !allFieldsOk) {
+    // Pre-fill whatever we have, open modal for user to complete
+    openAddModal();
+    if (title) document.getElementById('inputTitle').value = title;
+    if (timeVal) document.getElementById('inputTime').value = timeVal;
+    if (dateObj) document.getElementById('inputDate').value = dateObj.toISOString().slice(0, 10);
+    showToast('Partial match — please complete the details', 'amber');
+    return;
+  }
+
+  // ── Modal mode: fill form fields ──────────────────────────────────
+  document.getElementById('inputTitle').value = title;
+  if (timeVal) document.getElementById('inputTime').value = timeVal;
+  if (dateObj) document.getElementById('inputDate').value = dateObj.toISOString().slice(0, 10);
+
+  // ── Modal mic button feedback ─────────────────────────────────────
+  if (modalBtn) {
+    modalBtn.classList.add('success');
+    modalBtn.textContent = '✓';
+    setTimeout(() => { modalBtn.textContent = '🎤'; modalBtn.classList.remove('success'); }, 2000);
   }
 
   const datePart = dateObj
@@ -2178,7 +2333,7 @@ function processVoiceInput(transcript) {
   if (hintEl) hintEl.style.display = 'none';
 
   const ok = timeVal && dateObj;
-  showToast(ok ? '✅ Reminder parsed!' : '⚠️ Partial match — check fields', ok ? 'green' : 'amber');
+  showToast(ok ? 'Fields filled — review and save' : '⚠️ Partial match — check fields', ok ? 'green' : 'amber');
   setTimeout(() => document.getElementById('inputDesc')?.focus(), 100);
 }
 
@@ -2187,12 +2342,13 @@ const _origCloseModal = closeModal;
 closeModal = function() {
   stopVoice();
   finalTranscript = '';
+  voiceAutoSave = false;
   const transcriptEl = document.getElementById('voiceTranscript');
   const hintEl = document.getElementById('voiceHint');
-  const btn    = document.getElementById('micBtn');
+  const modalBtn = document.getElementById('micBtn');
   if (transcriptEl) { transcriptEl.style.display = 'none'; transcriptEl.textContent = ''; transcriptEl.style.fontStyle = 'italic'; }
   if (hintEl) hintEl.style.display = 'none';
-  if (btn)    { btn.textContent = '🎤'; btn.classList.remove('recording', 'success'); }
+  if (modalBtn) { modalBtn.textContent = '🎤'; modalBtn.classList.remove('recording', 'success'); }
   _origCloseModal();
 };
 
