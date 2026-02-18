@@ -2248,11 +2248,11 @@ function stopVoice() {
   try { recognition.stop(); } catch(e) {}
 }
 
-// ── Auto-save helper (Fix 3) ──────────────────────────────────────────
-// Directly saves a reminder object without touching the modal.
+// ── Voice save helper ─────────────────────────────────────────────────
+// Saves a reminder and returns it (so we can open the edit modal after).
 async function autoSaveReminder(title, dateStr, timeStr) {
   const nextFireAt = new Date(`${dateStr}T${timeStr}`).getTime();
-  if (isNaN(nextFireAt)) return false;
+  if (isNaN(nextFireAt)) return null;
 
   const reminder = {
     id: `r_${Date.now()}_${Math.random().toString(36).slice(2)}`,
@@ -2271,133 +2271,74 @@ async function autoSaveReminder(title, dateStr, timeStr) {
   reminders.push(reminder);
   renderAll();
   scheduleAll();
-
-  if (Notification.permission !== 'granted') {
-    showToast('Reminder set! Enable notifications to receive alerts', 'amber');
-  } else {
-    const diff = nextFireAt - Date.now();
-    const formatted = diff < 0
-      ? 'past time!'
-      : diff < 3600000
-        ? `in ${Math.round(diff / 60000)} min`
-        : diff < 86400000
-          ? `today at ${new Date(nextFireAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-          : `on ${new Date(nextFireAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
-    showToast(`Reminder set for ${formatted}`, 'green');
-  }
-  return true;
+  return reminder; // return object so caller can open edit modal
 }
 
 // ── Core parser ───────────────────────────────────────────────────────
-function processVoiceInput(transcript) {
+// Always auto-saves if transcript > 4 words, then opens edit modal.
+async function processVoiceInput(transcript) {
   stopVoice();
   if (!transcript) return;
 
-  const transcriptEl = document.getElementById('voiceTranscript');
-  const hintEl = document.getElementById('voiceHint');
-  const modalBtn = document.getElementById('micBtn');
+  const words = transcript.trim().split(/\s+/);
+  if (words.length <= 4) {
+    showToast('Too short — speak a full reminder', 'amber');
+    return;
+  }
+
   const floatBtn = document.getElementById('fabMicBtn');
 
+  // ── Extract fields via pattern registry ──────────────────────────
   const match = matchVoicePattern(transcript);
+  let title, timeVal, dateObj;
 
-  if (!match) {
-    if (voiceAutoSave) {
-      // Auto-save mode: no pattern — show toast, do nothing else
-      showToast('Pattern not recognised — try: "Call John at 3pm"', 'amber');
-      return;
-    }
-    // Modal mode: put full text in title, let user fix date/time
-    document.getElementById('inputTitle').value =
-      transcript.charAt(0).toUpperCase() + transcript.slice(1);
-    if (transcriptEl) {
-      transcriptEl.style.fontStyle = 'normal';
-      transcriptEl.innerHTML = `⚠️ Pattern not recognised — title filled, set date &amp; time manually.`;
-    }
-    if (hintEl) hintEl.style.display = 'none';
-    showToast('Pattern not recognised — set date/time manually', 'amber');
-    return;
-  }
-
-  // ── Resolve title, time, date from match ─────────────────────────
-  const title = match.title.charAt(0).toUpperCase() + match.title.slice(1);
-
-  let timeVal = null;
-  let dateObj = null;
-
-  if (match.datetimeStr) {
-    const dt = parseDateStr(match.datetimeStr);
-    if (dt) {
-      dateObj = dt;
-      const h = String(dt.getHours()).padStart(2, '0');
-      const mn = String(dt.getMinutes()).padStart(2, '0');
-      timeVal = `${h}:${mn}`;
-    }
-  } else if (match.reltimeStr) {
-    const dt = parseDateStr(match.reltimeStr);
-    if (dt) {
-      dateObj = dt;
-      const h = String(dt.getHours()).padStart(2, '0');
-      const mn = String(dt.getMinutes()).padStart(2, '0');
-      timeVal = `${h}:${mn}`;
+  if (match) {
+    title = match.title.charAt(0).toUpperCase() + match.title.slice(1);
+    if (match.datetimeStr) {
+      const dt = parseDateStr(match.datetimeStr);
+      if (dt) { dateObj = dt; timeVal = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`; }
+    } else if (match.reltimeStr) {
+      const dt = parseDateStr(match.reltimeStr);
+      if (dt) { dateObj = dt; timeVal = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`; }
+    } else {
+      timeVal = parseTimeStr(match.timeStr);
+      dateObj = parseDateStr(match.dateStr || 'today');
     }
   } else {
-    timeVal = parseTimeStr(match.timeStr);
-    dateObj = parseDateStr(match.dateStr || 'today');
+    // No pattern match — use full transcript as title, default to 5 min from now
+    title = transcript.charAt(0).toUpperCase() + transcript.slice(1);
   }
 
-  const allFieldsOk = title && timeVal && dateObj;
+  // Fallback date/time if pattern didn't resolve them
+  if (!dateObj) {
+    const fallback = new Date(Date.now() + 5 * 60000);
+    dateObj = fallback;
+    if (!timeVal) timeVal = `${String(fallback.getHours()).padStart(2,'0')}:${String(fallback.getMinutes()).padStart(2,'0')}`;
+  }
 
-  // Fix 3: if floating mic and all fields resolved — auto-save silently
-  if (voiceAutoSave && allFieldsOk) {
-    const dateStr = dateObj.toISOString().slice(0, 10);
-    autoSaveReminder(title, dateStr, timeVal);
-    // Reset floating mic button to success state briefly
-    if (floatBtn) {
-      floatBtn.textContent = '✓';
-      floatBtn.classList.add('success');
-      setTimeout(() => { floatBtn.textContent = '🎤'; floatBtn.classList.remove('success'); }, 2000);
-    }
+  const dateStr = dateObj.toISOString().slice(0, 10);
+
+  // ── Save immediately ──────────────────────────────────────────────
+  const saved = await autoSaveReminder(title, dateStr, timeVal);
+
+  // ── Reset mic button UI ───────────────────────────────────────────
+  if (floatBtn) {
+    floatBtn.textContent = '✓';
+    floatBtn.classList.add('success');
+    setTimeout(() => { floatBtn.textContent = '🎤'; floatBtn.classList.remove('success'); }, 2000);
+  }
+
+  if (!saved) {
+    showToast('Could not save — check date/time', 'red');
     return;
   }
 
-  // Fix 3: floating mic, fields incomplete — fall back to opening modal
-  if (voiceAutoSave && !allFieldsOk) {
-    // Pre-fill whatever we have, open modal for user to complete
-    openAddModal();
-    if (title) document.getElementById('inputTitle').value = title;
-    if (timeVal) document.getElementById('inputTime').value = timeVal;
-    if (dateObj) document.getElementById('inputDate').value = dateObj.toISOString().slice(0, 10);
-    showToast('Partial match — please complete the details', 'amber');
-    return;
-  }
-
-  // ── Modal mode: fill form fields ──────────────────────────────────
-  document.getElementById('inputTitle').value = title;
-  if (timeVal) document.getElementById('inputTime').value = timeVal;
-  if (dateObj) document.getElementById('inputDate').value = dateObj.toISOString().slice(0, 10);
-
-  // ── Modal mic button feedback ─────────────────────────────────────
-  if (modalBtn) {
-    modalBtn.classList.add('success');
-    modalBtn.textContent = '✓';
-    setTimeout(() => { modalBtn.textContent = '🎤'; modalBtn.classList.remove('success'); }, 2000);
-  }
-
-  const datePart = dateObj
-    ? dateObj.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
-    : match.dateStr || match.datetimeStr || match.reltimeStr || '?';
-
-  if (transcriptEl) {
-    transcriptEl.style.fontStyle = 'normal';
-    transcriptEl.innerHTML =
-      `<span style="color:var(--green)">✓</span> ${escHtml(title)}<br>` +
-      `<small style="color:var(--text-muted)">🕐 ${timeVal || match.timeStr || match.datetimeStr || match.reltimeStr} &nbsp;·&nbsp; 📅 ${datePart}</small>`;
-  }
-  if (hintEl) hintEl.style.display = 'none';
-
-  const ok = timeVal && dateObj;
-  showToast(ok ? 'Fields filled — review and save' : '⚠️ Partial match — check fields', ok ? 'green' : 'amber');
-  setTimeout(() => document.getElementById('inputDesc')?.focus(), 100);
+  // ── Open edit modal to show the saved reminder ────────────────────
+  // Small delay so the list re-render settles before modal animates in
+  setTimeout(() => {
+    openEditModal(saved.id);
+    showToast(match ? '✅ Reminder saved!' : '✅ Saved — no time pattern, check time', match ? 'green' : 'amber');
+  }, 100);
 }
 
 // ── Reset voice UI when modal closes ─────────────────────────────────
