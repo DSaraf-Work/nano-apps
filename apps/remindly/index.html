@@ -1,0 +1,1858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Remindly"/>
+<meta name="theme-color" content="#0a0e1a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<link rel="manifest" href="./manifest.json"/>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%230a0e1a'/><text y='130' x='30' font-size='120'>🔔</text></svg>"/>
+<title>Remindly</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #080c18;
+  --surface: #0f1629;
+  --surface2: #161e35;
+  --surface3: #1e2845;
+  --border: rgba(245,158,11,0.12);
+  --border2: rgba(245,158,11,0.22);
+  --amber: #f59e0b;
+  --amber-dim: rgba(245,158,11,0.15);
+  --amber-glow: rgba(245,158,11,0.06);
+  --text: #e8dcc8;
+  --text-dim: #8a7d6a;
+  --text-muted: #4a4236;
+  --green: #10b981;
+  --green-dim: rgba(16,185,129,0.15);
+  --red: #ef4444;
+  --red-dim: rgba(239,68,68,0.12);
+  --blue: #60a5fa;
+  --blue-dim: rgba(96,165,250,0.12);
+  --purple: #a78bfa;
+  --purple-dim: rgba(167,139,250,0.12);
+  --radius: 14px;
+  --radius-sm: 8px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 60% 40% at 50% -10%, rgba(245,158,11,0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 90% 80%, rgba(96,165,250,0.04) 0%, transparent 60%);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+.header {
+  padding: calc(var(--safe-top) + 16px) 20px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(8,12,24,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-icon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--amber), #f97316);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  box-shadow: 0 4px 16px rgba(245,158,11,0.3);
+}
+
+.logo-text {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+
+.logo-text span {
+  color: var(--amber);
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 16px;
+}
+
+.icon-btn:hover { background: var(--surface3); color: var(--amber); border-color: var(--border2); }
+.icon-btn:active { transform: scale(0.93); }
+
+/* ── Tabs ─────────────────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 12px 20px;
+  background: rgba(8,12,24,0.7);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.tab {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  letter-spacing: 0.2px;
+}
+
+.tab.active {
+  background: var(--amber-dim);
+  border-color: var(--border2);
+  color: var(--amber);
+}
+
+.tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
+
+/* ── Main Content ────────────────────────────────────────────────────── */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 16px calc(80px + var(--safe-bottom));
+  -webkit-overflow-scrolling: touch;
+}
+
+.content::-webkit-scrollbar { width: 0; }
+
+/* ── View ────────────────────────────────────────────────────────────── */
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── Summary Bar ─────────────────────────────────────────────────────── */
+.summary-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+
+.summary-card.amber::before { background: linear-gradient(90deg, transparent, var(--amber), transparent); }
+.summary-card.green::before { background: linear-gradient(90deg, transparent, var(--green), transparent); }
+.summary-card.blue::before { background: linear-gradient(90deg, transparent, var(--blue), transparent); }
+
+.summary-num {
+  font-family: 'Playfair Display', serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.summary-card.amber .summary-num { color: var(--amber); }
+.summary-card.green .summary-num { color: var(--green); }
+.summary-card.blue .summary-num { color: var(--blue); }
+
+.summary-label {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+}
+
+/* ── Section ─────────────────────────────────────────────────────────── */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  margin-top: 20px;
+  padding-left: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title:first-child { margin-top: 0; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── Reminder Card ──────────────────────────────────────────────────── */
+.reminder-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  transition: all 0.25s;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.reminder-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--amber);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.reminder-card:hover::before { opacity: 1; }
+.reminder-card:hover { border-color: var(--border2); background: var(--surface2); }
+.reminder-card:active { transform: scale(0.99); }
+
+.reminder-card.overdue { border-color: rgba(239,68,68,0.25); }
+.reminder-card.overdue::before { background: var(--red); }
+.reminder-card.overdue:hover::before { opacity: 1; }
+
+.reminder-card.completed {
+  opacity: 0.45;
+}
+.reminder-card.completed::before { background: var(--green); }
+
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.card-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-size: 12px;
+  color: transparent;
+}
+
+.reminder-card.completed .card-check {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+}
+
+.card-check:hover { border-color: var(--amber); transform: scale(1.1); }
+
+.card-body { flex: 1; min-width: 0; }
+
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reminder-card.completed .card-title {
+  text-decoration: line-through;
+  color: var(--text-dim);
+}
+
+.card-desc {
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 8px;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  font-weight: 400;
+  padding: 3px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.2px;
+}
+
+.badge-time { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
+.badge-repeat { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(96,165,250,0.2); }
+.badge-overdue { background: var(--red-dim); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+.badge-done { background: var(--green-dim); color: var(--green); border: 1px solid rgba(16,185,129,0.2); }
+.badge-followup { background: var(--purple-dim); color: var(--purple); border: 1px solid rgba(167,139,250,0.2); }
+
+.card-actions {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.reminder-card:hover .card-actions { opacity: 1; }
+
+.card-action-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface3);
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+
+.card-action-btn:hover { background: var(--surface); color: var(--text); }
+.card-action-btn.del:hover { background: var(--red-dim); color: var(--red); border-color: rgba(239,68,68,0.3); }
+
+/* ── Empty State ─────────────────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 50px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state .empty-icon {
+  font-size: 52px;
+  margin-bottom: 16px;
+  opacity: 0.7;
+  display: block;
+}
+
+.empty-state h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.empty-state p {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* ── FAB ─────────────────────────────────────────────────────────────── */
+.fab {
+  position: fixed;
+  bottom: calc(20px + var(--safe-bottom));
+  right: 20px;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--amber), #f97316);
+  border: none;
+  color: #0a0e1a;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(245,158,11,0.4), 0 2px 8px rgba(0,0,0,0.4);
+  transition: all 0.25s;
+  font-weight: bold;
+}
+
+.fab:hover { transform: scale(1.08) rotate(5deg); box-shadow: 0 12px 40px rgba(245,158,11,0.5); }
+.fab:active { transform: scale(0.94); }
+
+/* ── Modal ───────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8,12,24,0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.modal-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.modal {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border-radius: 24px 24px 0 0;
+  padding: 8px 0 calc(20px + var(--safe-bottom));
+  border: 1px solid var(--border2);
+  border-bottom: none;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1);
+  max-height: 92vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.modal-overlay.open .modal {
+  transform: translateY(0);
+}
+
+.modal::-webkit-scrollbar { width: 0; }
+
+.modal-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--border2);
+  border-radius: 2px;
+  margin: 8px auto 16px;
+}
+
+.modal-header {
+  padding: 0 20px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.modal-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modal-subtitle {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 3px;
+}
+
+.modal-body { padding: 0 20px; }
+
+/* ── Form ────────────────────────────────────────────────────────────── */
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+  margin-bottom: 7px;
+}
+
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 11px 14px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px var(--amber-glow);
+  background: var(--surface3);
+}
+
+.form-textarea {
+  min-height: 70px;
+  resize: none;
+}
+
+.form-select option { background: var(--surface2); color: var(--text); }
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* ── Interval Row ─────────────────────────────────────────────────────── */
+.interval-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 10px;
+}
+
+/* ── Toggle Switch ──────────────────────────────────────────────────── */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+}
+
+.toggle-label { font-size: 14px; font-weight: 500; color: var(--text); }
+.toggle-desc { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.toggle input { opacity: 0; width: 0; height: 0; }
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--surface3);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: 0.25s;
+  border: 1px solid var(--border);
+}
+
+.toggle-slider:before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  background: var(--text-dim);
+  border-radius: 50%;
+  transition: 0.25s;
+}
+
+input:checked + .toggle-slider { background: var(--amber-dim); border-color: var(--amber); }
+input:checked + .toggle-slider:before { transform: translateX(18px); background: var(--amber); }
+
+/* ── Follow-up Builder ──────────────────────────────────────────────── */
+.followup-list { margin-bottom: 10px; }
+
+.followup-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  animation: slideIn 0.2s ease;
+}
+
+.followup-item .fi-label {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.followup-item .fi-del {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  background: var(--red-dim);
+  border: none;
+  color: var(--red);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.followup-item .fi-type {
+  font-size: 11px;
+  color: var(--purple);
+  background: var(--purple-dim);
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid rgba(167,139,250,0.2);
+}
+
+.add-followup-row {
+  display: flex;
+  gap: 8px;
+}
+
+.add-followup-row .form-input {
+  flex: 1;
+}
+
+.btn-secondary {
+  padding: 11px 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-secondary:hover { background: var(--surface3); color: var(--text); border-color: var(--border2); }
+
+/* ── Primary Btn ─────────────────────────────────────────────────────── */
+.btn-primary {
+  width: 100%;
+  padding: 15px;
+  background: linear-gradient(135deg, var(--amber), #f97316);
+  border: none;
+  border-radius: var(--radius);
+  color: #0a0e1a;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s;
+  margin-top: 20px;
+  box-shadow: 0 4px 20px rgba(245,158,11,0.3);
+  letter-spacing: 0.2px;
+}
+
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(245,158,11,0.4); }
+.btn-primary:active { transform: scale(0.98); }
+
+/* ── Notification Banner ─────────────────────────────────────────────── */
+.notif-banner {
+  background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(249,115,22,0.08));
+  border: 1px solid rgba(245,158,11,0.25);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.notif-banner:hover { background: rgba(245,158,11,0.18); }
+.notif-banner.hidden { display: none; }
+
+.notif-icon { font-size: 22px; flex-shrink: 0; }
+
+.notif-text h4 { font-size: 14px; font-weight: 600; color: var(--amber); margin-bottom: 2px; }
+.notif-text p { font-size: 12px; color: var(--text-dim); }
+
+/* ── Install Banner ──────────────────────────────────────────────────── */
+.install-banner {
+  background: linear-gradient(135deg, rgba(96,165,250,0.1), rgba(167,139,250,0.08));
+  border: 1px solid rgba(96,165,250,0.2);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.install-banner.hidden { display: none; }
+.install-banner:hover { background: rgba(96,165,250,0.15); }
+.install-banner .notif-text h4 { color: var(--blue); }
+
+/* ── Settings ────────────────────────────────────────────────────────── */
+.settings-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.settings-row:last-child { border-bottom: none; }
+.settings-row:hover { background: var(--surface2); }
+
+.settings-row-left { display: flex; align-items: center; gap: 12px; }
+.settings-row-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.settings-row-icon.amber { background: var(--amber-dim); }
+.settings-row-icon.green { background: var(--green-dim); }
+.settings-row-icon.blue { background: var(--blue-dim); }
+.settings-row-icon.red { background: var(--red-dim); }
+
+.settings-row-text h4 { font-size: 14px; font-weight: 500; color: var(--text); }
+.settings-row-text p { font-size: 12px; color: var(--text-dim); }
+.settings-row-right { color: var(--text-muted); font-size: 14px; }
+.settings-row-right.value { color: var(--text-dim); font-family: 'DM Mono', monospace; font-size: 12px; }
+
+/* ── Status Dots ─────────────────────────────────────────────────────── */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.status-dot.red { background: var(--red); }
+.status-dot.amber { background: var(--amber); }
+
+/* ── Toast ───────────────────────────────────────────────────────────── */
+.toast-container {
+  position: fixed;
+  top: calc(var(--safe-top) + 80px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  max-width: 340px;
+  width: calc(100% - 32px);
+}
+
+.toast {
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  animation: toastIn 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-12px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.toast.exit { animation: toastOut 0.3s ease forwards; }
+@keyframes toastOut {
+  to { opacity: 0; transform: translateY(-8px) scale(0.95); }
+}
+
+/* ── Time display ─────────────────────────────────────────────────────── */
+.time-display {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 8px 16px;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+/* ── Upcoming timeline ──────────────────────────────────────────────── */
+.timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.timeline-item:last-child { border-bottom: none; }
+
+.timeline-time {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 60px;
+  text-align: right;
+  padding-top: 2px;
+}
+
+.timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--amber);
+  flex-shrink: 0;
+  margin-top: 4px;
+  box-shadow: 0 0 8px rgba(245,158,11,0.4);
+}
+
+.timeline-content {}
+.timeline-content h4 { font-size: 14px; font-weight: 500; color: var(--text); }
+.timeline-content p { font-size: 12px; color: var(--text-dim); }
+
+/* Responsive */
+@media (max-width: 360px) {
+  .summary-bar { grid-template-columns: repeat(3, 1fr); }
+  .summary-num { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Header -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">🔔</div>
+    <div class="logo-text">Remind<span>ly</span></div>
+  </div>
+  <div class="header-actions">
+    <button class="icon-btn" id="themeBtn" title="Stats" onclick="switchTab('calendar')">📅</button>
+    <button class="icon-btn" id="settingsBtn" onclick="switchTab('settings')">⚙️</button>
+  </div>
+</header>
+
+<!-- Tabs -->
+<nav class="tabs">
+  <button class="tab active" onclick="switchTab('home')">Today</button>
+  <button class="tab" onclick="switchTab('all')">All</button>
+  <button class="tab" onclick="switchTab('calendar')">Upcoming</button>
+  <button class="tab" onclick="switchTab('settings')">Settings</button>
+</nav>
+
+<!-- Content -->
+<main class="content" id="mainContent">
+
+  <!-- HOME VIEW -->
+  <div class="view active" id="view-home">
+    <div id="notifBanner" class="notif-banner" onclick="requestNotificationPermission()">
+      <span class="notif-icon">🔔</span>
+      <div class="notif-text">
+        <h4>Enable Push Notifications</h4>
+        <p>Tap to allow reminders even when app is closed</p>
+      </div>
+    </div>
+
+    <div id="installBanner" class="install-banner hidden" onclick="installPWA()">
+      <span class="notif-icon">📲</span>
+      <div class="notif-text">
+        <h4>Install Remindly</h4>
+        <p>Add to home screen for the best experience</p>
+      </div>
+    </div>
+
+    <div class="summary-bar">
+      <div class="summary-card amber">
+        <div class="summary-num" id="sumActive">0</div>
+        <div class="summary-label">Active</div>
+      </div>
+      <div class="summary-card green">
+        <div class="summary-num" id="sumDone">0</div>
+        <div class="summary-label">Done Today</div>
+      </div>
+      <div class="summary-card blue">
+        <div class="summary-num" id="sumOverdue">0</div>
+        <div class="summary-label">Overdue</div>
+      </div>
+    </div>
+
+    <div class="section-title">Due Soon</div>
+    <div id="reminderListHome"></div>
+  </div>
+
+  <!-- ALL VIEW -->
+  <div class="view" id="view-all">
+    <div class="section-title">All Reminders</div>
+    <div id="reminderListAll"></div>
+  </div>
+
+  <!-- CALENDAR VIEW -->
+  <div class="view" id="view-calendar">
+    <div class="section-title">Upcoming Schedule</div>
+    <div id="upcomingList"></div>
+  </div>
+
+  <!-- SETTINGS VIEW -->
+  <div class="view" id="view-settings">
+    <div class="section-title">Notifications</div>
+    <div class="settings-section">
+      <div class="settings-row" onclick="requestNotificationPermission()">
+        <div class="settings-row-left">
+          <div class="settings-row-icon amber">🔔</div>
+          <div class="settings-row-text">
+            <h4>Push Notifications</h4>
+            <p>Get alerted even when app is closed</p>
+          </div>
+        </div>
+        <div class="settings-row-right" id="notifStatus">
+          <div class="status-dot red"></div>
+        </div>
+      </div>
+      <div class="settings-row" onclick="testNotification()">
+        <div class="settings-row-left">
+          <div class="settings-row-icon green">🧪</div>
+          <div class="settings-row-text">
+            <h4>Test Notification</h4>
+            <p>Send a test push right now</p>
+          </div>
+        </div>
+        <div class="settings-row-right">›</div>
+      </div>
+    </div>
+
+    <div class="section-title">App</div>
+    <div class="settings-section">
+      <div class="settings-row" onclick="installPWA()">
+        <div class="settings-row-left">
+          <div class="settings-row-icon blue">📲</div>
+          <div class="settings-row-text">
+            <h4>Install as App</h4>
+            <p>Add to home screen</p>
+          </div>
+        </div>
+        <div class="settings-row-right">›</div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-icon amber">⚡</div>
+          <div class="settings-row-text">
+            <h4>Service Worker</h4>
+            <p>Background sync status</p>
+          </div>
+        </div>
+        <div class="settings-row-right value" id="swStatus">Checking…</div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-icon green">💾</div>
+          <div class="settings-row-text">
+            <h4>Reminders Stored</h4>
+            <p>Saved locally on device</p>
+          </div>
+        </div>
+        <div class="settings-row-right value" id="storageCount">0</div>
+      </div>
+    </div>
+
+    <div class="section-title">Data</div>
+    <div class="settings-section">
+      <div class="settings-row" onclick="exportReminders()">
+        <div class="settings-row-left">
+          <div class="settings-row-icon blue">📤</div>
+          <div class="settings-row-text"><h4>Export Reminders</h4><p>Download as JSON</p></div>
+        </div>
+        <div class="settings-row-right">›</div>
+      </div>
+      <div class="settings-row" onclick="clearCompleted()">
+        <div class="settings-row-left">
+          <div class="settings-row-icon red">🗑️</div>
+          <div class="settings-row-text"><h4>Clear Completed</h4><p>Remove all done reminders</p></div>
+        </div>
+        <div class="settings-row-right">›</div>
+      </div>
+    </div>
+
+    <div class="time-display">
+      Remindly v1.0 · All data stored locally · No account required
+    </div>
+  </div>
+
+</main>
+
+<!-- FAB -->
+<button class="fab" id="fab" onclick="openAddModal()">+</button>
+
+<!-- Add/Edit Reminder Modal -->
+<div class="modal-overlay" id="addModal" onclick="closeModalOnOverlay(event)">
+  <div class="modal" id="addModalInner">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">New Reminder</div>
+      <div class="modal-subtitle" id="modalSubtitle">Set up your reminder details below</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Title *</label>
+        <input type="text" id="inputTitle" class="form-input" placeholder="What do you need to remember?" maxlength="80"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea id="inputDesc" class="form-textarea" placeholder="Add more details (optional)…" maxlength="300"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date *</label>
+          <input type="date" id="inputDate" class="form-input"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Time *</label>
+          <input type="time" id="inputTime" class="form-input"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Repeat</label>
+        <select id="inputRepeat" class="form-select" onchange="toggleIntervalRow()">
+          <option value="none">No repeat (once)</option>
+          <option value="daily">Every day</option>
+          <option value="weekly">Every week</option>
+          <option value="hourly">Every hour</option>
+          <option value="interval">Custom interval…</option>
+        </select>
+      </div>
+      <div class="form-group" id="intervalRow" style="display:none">
+        <label class="form-label">Custom Interval</label>
+        <div class="interval-row">
+          <input type="number" id="inputIntervalVal" class="form-input" placeholder="e.g. 30" min="1" max="9999"/>
+          <select id="inputIntervalUnit" class="form-select">
+            <option value="min">Minutes</option>
+            <option value="hour">Hours</option>
+            <option value="day">Days</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Follow-up Actions -->
+      <div class="form-group">
+        <label class="form-label">Follow-up Actions</label>
+        <div class="followup-list" id="followupList"></div>
+        <div class="add-followup-row">
+          <input type="text" id="followupInput" class="form-input" placeholder="e.g. Call back, Schedule meeting…" maxlength="50"/>
+          <button class="btn-secondary" onclick="addFollowUp()">+ Add</button>
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:6px;">Follow-ups appear as notification actions when the reminder fires</div>
+      </div>
+
+      <button class="btn-primary" id="saveBtn" onclick="saveReminder()">Set Reminder</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DB
+// ═══════════════════════════════════════════════════════════════════
+let db;
+const DB_NAME = 'remindly';
+const STORE = 'reminders';
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(STORE)) {
+        const s = d.createObjectStore(STORE, { keyPath: 'id' });
+        s.createIndex('nextFireAt', 'nextFireAt');
+      }
+    };
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function dbGetAll() {
+  const tx = db.transaction(STORE, 'readonly');
+  return new Promise((res, rej) => {
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function dbPut(r) {
+  const tx = db.transaction(STORE, 'readwrite');
+  return new Promise((res, rej) => {
+    const req = tx.objectStore(STORE).put(r);
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function dbDelete(id) {
+  const tx = db.transaction(STORE, 'readwrite');
+  return new Promise((res, rej) => {
+    const req = tx.objectStore(STORE).delete(id);
+    req.onsuccess = () => res();
+    req.onerror = () => rej(req.error);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════════
+let reminders = [];
+let editingId = null;
+let followUps = [];
+let deferInstall = null;
+let scheduledTimers = {};
+
+// ═══════════════════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════════════════
+(async () => {
+  db = await openDB();
+  reminders = await dbGetAll();
+  registerSW();
+  updateNotifBanner();
+  renderAll();
+  scheduleAll();
+  setupInstallPrompt();
+  setDefaultDateTime();
+
+  // Live clock in time display
+  setInterval(() => {
+    const el = document.querySelector('.time-display');
+    if (el && currentTab === 'settings') {
+      const now = new Date();
+      el.textContent = `${now.toLocaleDateString()} ${now.toLocaleTimeString()} · Remindly v1.0`;
+    }
+  }, 1000);
+
+  // Re-check due reminders every minute
+  setInterval(async () => {
+    await checkAndFireUI();
+    renderAll();
+  }, 60000);
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+// Service Worker
+// ═══════════════════════════════════════════════════════════════════
+function registerSW() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
+      .then(reg => {
+        document.getElementById('swStatus').textContent = 'Active ✓';
+        // Register periodic sync if supported
+        if ('periodicSync' in reg) {
+          reg.periodicSync.register('check-reminders', { minInterval: 60000 }).catch(() => {});
+        }
+      })
+      .catch(() => {
+        document.getElementById('swStatus').textContent = 'Offline mode';
+      });
+
+    navigator.serviceWorker.addEventListener('message', e => {
+      const { type, reminderId } = e.data;
+      if (type === 'REMINDER_DONE') {
+        const r = reminders.find(r => r.id === reminderId);
+        if (r) { r.enabled = false; r.completedAt = Date.now(); dbPut(r); renderAll(); }
+      }
+      if (type === 'REMINDER_SNOOZED') {
+        renderAll();
+      }
+      if (type === 'FOLLOWUP_TRIGGERED') {
+        showToast('📋 Follow-up triggered!', 'blue');
+      }
+    });
+  } else {
+    document.getElementById('swStatus').textContent = 'Not supported';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Notifications
+// ═══════════════════════════════════════════════════════════════════
+function updateNotifBanner() {
+  const banner = document.getElementById('notifBanner');
+  const status = document.getElementById('notifStatus');
+  if (!('Notification' in window)) {
+    banner.style.display = 'none';
+    return;
+  }
+  if (Notification.permission === 'granted') {
+    banner.classList.add('hidden');
+    status.innerHTML = '<div class="status-dot green"></div>';
+  } else if (Notification.permission === 'denied') {
+    banner.querySelector('.notif-text p').textContent = 'Notifications blocked. Enable in browser settings.';
+    status.innerHTML = '<div class="status-dot red"></div>';
+  }
+}
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    showToast('Notifications not supported on this browser', 'red');
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  updateNotifBanner();
+  if (perm === 'granted') {
+    showToast('✅ Notifications enabled!', 'green');
+    scheduleAll();
+  } else {
+    showToast('Notifications blocked. Enable in device settings.', 'red');
+  }
+}
+
+async function testNotification() {
+  if (Notification.permission !== 'granted') {
+    await requestNotificationPermission();
+    return;
+  }
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    const reg = await navigator.serviceWorker.ready;
+    reg.showNotification('🔔 Remindly Test', {
+      body: 'Push notifications are working correctly!',
+      icon: '/icon-192.png',
+      actions: [
+        { action: 'done', title: '✅ Got it!' },
+        { action: 'snooze5', title: '⏰ Snooze' },
+      ],
+      requireInteraction: true,
+      vibrate: [200, 100, 200],
+    });
+  } else {
+    new Notification('🔔 Remindly Test', {
+      body: 'Push notifications are working correctly!',
+    });
+  }
+  showToast('Test notification sent!', 'amber');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Schedule Timers (fallback when page is open)
+// ═══════════════════════════════════════════════════════════════════
+function scheduleAll() {
+  if (Notification.permission !== 'granted') return;
+  Object.values(scheduledTimers).forEach(clearTimeout);
+  scheduledTimers = {};
+
+  reminders.forEach(r => {
+    if (!r.enabled || !r.nextFireAt) return;
+    const delay = r.nextFireAt - Date.now();
+    if (delay > 0 && delay < 86400000 * 7) {
+      scheduledTimers[r.id] = setTimeout(() => fireReminder(r), delay);
+    }
+  });
+}
+
+async function fireReminder(r) {
+  if (!r.enabled) return;
+  // Show notification
+  const actions = [
+    { action: 'done', title: '✅ Done' },
+    { action: 'snooze5', title: '⏰ 5m' },
+    { action: 'snooze15', title: '⏰ 15m' },
+    { action: 'snooze60', title: '⏰ 1h' },
+  ];
+  const followUpActions = (r.followUps || []).slice(0, 2).map(f => ({
+    action: `followup_${f.id}`, title: f.label
+  }));
+  const allActions = [...followUpActions, ...actions].slice(0, 4);
+
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification(r.title, {
+      body: r.description || 'Reminder!',
+      icon: '/icon-192.png',
+      tag: `reminder-${r.id}`,
+      renotify: true,
+      requireInteraction: true,
+      data: { reminderId: r.id, followUps: r.followUps || [] },
+      actions: allActions,
+      vibrate: [200, 100, 200, 100, 400],
+    });
+  } else if (Notification.permission === 'granted') {
+    new Notification(r.title, { body: r.description || 'Reminder!', requireInteraction: true });
+  }
+
+  // Handle repeat
+  const now = Date.now();
+  let nextFire = null;
+  if (r.repeat === 'daily') nextFire = now + 86400000;
+  else if (r.repeat === 'weekly') nextFire = now + 604800000;
+  else if (r.repeat === 'hourly') nextFire = now + 3600000;
+  else if (r.repeat === 'interval' && r.intervalMs) nextFire = now + r.intervalMs;
+
+  const idx = reminders.findIndex(x => x.id === r.id);
+  if (idx !== -1) {
+    if (nextFire) {
+      reminders[idx] = { ...reminders[idx], nextFireAt: nextFire };
+    } else {
+      reminders[idx] = { ...reminders[idx], enabled: false, completedAt: now };
+    }
+    await dbPut(reminders[idx]);
+    renderAll();
+    if (nextFire) scheduleAll();
+  }
+}
+
+async function checkAndFireUI() {
+  const now = Date.now();
+  for (const r of reminders) {
+    if (!r.enabled || !r.nextFireAt) continue;
+    if (r.nextFireAt <= now) {
+      await fireReminder(r);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Rendering
+// ═══════════════════════════════════════════════════════════════════
+let currentTab = 'home';
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const tabs = ['home', 'all', 'calendar', 'settings'];
+    t.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(`view-${tab}`).classList.add('active');
+  renderAll();
+}
+
+function renderAll() {
+  renderHome();
+  renderAll2();
+  renderUpcoming();
+  updateSummary();
+  document.getElementById('storageCount').textContent = reminders.length;
+}
+
+function formatTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = ts - now.getTime();
+  if (diff < 0) return 'Overdue';
+  if (diff < 60000) return 'Due now';
+  if (diff < 3600000) return `In ${Math.round(diff / 60000)}m`;
+  if (diff < 86400000) return `Today ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  if (diff < 172800000) return `Tomorrow ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatRepeat(r) {
+  if (r.repeat === 'none') return '';
+  if (r.repeat === 'daily') return 'Daily';
+  if (r.repeat === 'weekly') return 'Weekly';
+  if (r.repeat === 'hourly') return 'Hourly';
+  if (r.repeat === 'interval') {
+    const ms = r.intervalMs || 0;
+    if (ms >= 86400000) return `Every ${ms / 86400000}d`;
+    if (ms >= 3600000) return `Every ${ms / 3600000}h`;
+    return `Every ${ms / 60000}m`;
+  }
+  return '';
+}
+
+function buildCard(r, compact = false) {
+  const now = Date.now();
+  const isOverdue = r.enabled && r.nextFireAt && r.nextFireAt < now;
+  const isDone = !r.enabled && r.completedAt;
+  const repeatLabel = formatRepeat(r);
+  const timeLabel = r.nextFireAt ? formatTime(r.nextFireAt) : '—';
+  const hasFU = r.followUps && r.followUps.length > 0;
+
+  return `
+    <div class="reminder-card ${isOverdue ? 'overdue' : ''} ${isDone ? 'completed' : ''}"
+         onclick="openEditModal('${r.id}')">
+      <div class="card-top">
+        <div class="card-check" onclick="event.stopPropagation(); toggleDone('${r.id}')">
+          ${isDone ? '✓' : ''}
+        </div>
+        <div class="card-body">
+          <div class="card-title">${escHtml(r.title)}</div>
+          ${r.description ? `<div class="card-desc">${escHtml(r.description)}</div>` : ''}
+          <div class="card-meta">
+            ${r.nextFireAt ? `<span class="badge ${isOverdue ? 'badge-overdue' : 'badge-time'}">⏰ ${timeLabel}</span>` : ''}
+            ${repeatLabel ? `<span class="badge badge-repeat">↺ ${repeatLabel}</span>` : ''}
+            ${isDone ? `<span class="badge badge-done">✓ Done</span>` : ''}
+            ${hasFU ? `<span class="badge badge-followup">📋 ${r.followUps.length} follow-up${r.followUps.length > 1 ? 's' : ''}</span>` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="card-actions">
+        ${!isDone ? `<button class="card-action-btn" title="Snooze 15m" onclick="event.stopPropagation(); quickSnooze('${r.id}', 15)">⏰</button>` : ''}
+        <button class="card-action-btn del" title="Delete" onclick="event.stopPropagation(); deleteReminder('${r.id}')">✕</button>
+      </div>
+    </div>`;
+}
+
+function renderHome() {
+  const now = Date.now();
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+  const upcoming = reminders
+    .filter(r => r.enabled && r.nextFireAt)
+    .sort((a, b) => a.nextFireAt - b.nextFireAt);
+  const todayItems = upcoming.filter(r => r.nextFireAt <= todayEnd.getTime() + 86400000);
+  const el = document.getElementById('reminderListHome');
+  el.innerHTML = todayItems.length
+    ? todayItems.map(r => buildCard(r)).join('')
+    : `<div class="empty-state"><span class="empty-icon">🎯</span><h3>All clear!</h3><p>No reminders due soon.<br/>Tap + to create one.</p></div>`;
+}
+
+function renderAll2() {
+  const sorted = [...reminders].sort((a, b) => {
+    if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+    return (a.nextFireAt || 0) - (b.nextFireAt || 0);
+  });
+  const el = document.getElementById('reminderListAll');
+  el.innerHTML = sorted.length
+    ? sorted.map(r => buildCard(r)).join('')
+    : `<div class="empty-state"><span class="empty-icon">📋</span><h3>No reminders yet</h3><p>Tap the + button to get started.</p></div>`;
+}
+
+function renderUpcoming() {
+  const upcoming = reminders
+    .filter(r => r.enabled && r.nextFireAt)
+    .sort((a, b) => a.nextFireAt - b.nextFireAt)
+    .slice(0, 20);
+  const el = document.getElementById('upcomingList');
+  if (!upcoming.length) {
+    el.innerHTML = `<div class="empty-state"><span class="empty-icon">📅</span><h3>Nothing upcoming</h3><p>Your scheduled reminders will appear here.</p></div>`;
+    return;
+  }
+  const items = upcoming.map(r => {
+    const d = new Date(r.nextFireAt);
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateStr = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    return `<div class="timeline-item">
+      <div class="timeline-time"><div>${timeStr}</div><div style="font-size:10px;margin-top:2px;">${dateStr}</div></div>
+      <div class="timeline-dot"></div>
+      <div class="timeline-content">
+        <h4>${escHtml(r.title)}</h4>
+        ${r.description ? `<p>${escHtml(r.description)}</p>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:0 16px;">${items}</div>`;
+}
+
+function updateSummary() {
+  const now = Date.now();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayTs = today.getTime();
+
+  const active = reminders.filter(r => r.enabled).length;
+  const done = reminders.filter(r => !r.enabled && r.completedAt && r.completedAt >= todayTs).length;
+  const overdue = reminders.filter(r => r.enabled && r.nextFireAt && r.nextFireAt < now).length;
+
+  document.getElementById('sumActive').textContent = active;
+  document.getElementById('sumDone').textContent = done;
+  document.getElementById('sumOverdue').textContent = overdue;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Modal
+// ═══════════════════════════════════════════════════════════════════
+function openAddModal() {
+  editingId = null;
+  followUps = [];
+  document.getElementById('modalTitle').textContent = 'New Reminder';
+  document.getElementById('modalSubtitle').textContent = 'Fill in the details below';
+  document.getElementById('saveBtn').textContent = 'Set Reminder';
+  document.getElementById('inputTitle').value = '';
+  document.getElementById('inputDesc').value = '';
+  document.getElementById('inputRepeat').value = 'none';
+  document.getElementById('intervalRow').style.display = 'none';
+  document.getElementById('followupInput').value = '';
+  setDefaultDateTime();
+  renderFollowUps();
+  document.getElementById('addModal').classList.add('open');
+}
+
+function openEditModal(id) {
+  const r = reminders.find(r => r.id === id);
+  if (!r) return;
+  editingId = id;
+  followUps = (r.followUps || []).map(f => ({ ...f }));
+
+  document.getElementById('modalTitle').textContent = 'Edit Reminder';
+  document.getElementById('modalSubtitle').textContent = 'Update your reminder details';
+  document.getElementById('saveBtn').textContent = 'Save Changes';
+
+  document.getElementById('inputTitle').value = r.title;
+  document.getElementById('inputDesc').value = r.description || '';
+  document.getElementById('inputRepeat').value = r.repeat || 'none';
+
+  if (r.nextFireAt) {
+    const d = new Date(r.nextFireAt);
+    document.getElementById('inputDate').value = d.toISOString().slice(0, 10);
+    document.getElementById('inputTime').value = d.toTimeString().slice(0, 5);
+  }
+
+  if (r.repeat === 'interval' && r.intervalMs) {
+    document.getElementById('intervalRow').style.display = '';
+    if (r.intervalMs % 86400000 === 0) {
+      document.getElementById('inputIntervalVal').value = r.intervalMs / 86400000;
+      document.getElementById('inputIntervalUnit').value = 'day';
+    } else if (r.intervalMs % 3600000 === 0) {
+      document.getElementById('inputIntervalVal').value = r.intervalMs / 3600000;
+      document.getElementById('inputIntervalUnit').value = 'hour';
+    } else {
+      document.getElementById('inputIntervalVal').value = r.intervalMs / 60000;
+      document.getElementById('inputIntervalUnit').value = 'min';
+    }
+  } else {
+    document.getElementById('intervalRow').style.display = 'none';
+  }
+
+  renderFollowUps();
+  document.getElementById('addModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('addModal').classList.remove('open');
+}
+
+function closeModalOnOverlay(e) {
+  if (e.target === document.getElementById('addModal')) closeModal();
+}
+
+function setDefaultDateTime() {
+  const now = new Date(Date.now() + 3600000); // +1 hour
+  document.getElementById('inputDate').value = now.toISOString().slice(0, 10);
+  document.getElementById('inputTime').value = now.toTimeString().slice(0, 5);
+}
+
+function toggleIntervalRow() {
+  const v = document.getElementById('inputRepeat').value;
+  document.getElementById('intervalRow').style.display = v === 'interval' ? '' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Follow-ups
+// ═══════════════════════════════════════════════════════════════════
+function addFollowUp() {
+  const inp = document.getElementById('followupInput');
+  const label = inp.value.trim();
+  if (!label) return;
+  followUps.push({ id: Date.now(), label });
+  inp.value = '';
+  renderFollowUps();
+}
+
+function removeFollowUp(id) {
+  followUps = followUps.filter(f => f.id !== id);
+  renderFollowUps();
+}
+
+function renderFollowUps() {
+  const el = document.getElementById('followupList');
+  el.innerHTML = followUps.map(f => `
+    <div class="followup-item">
+      <span class="fi-type">action</span>
+      <span class="fi-label">${escHtml(f.label)}</span>
+      <button class="fi-del" onclick="removeFollowUp(${f.id})">✕</button>
+    </div>`).join('');
+}
+
+// Allow Enter key on follow-up input
+document.getElementById('followupInput')?.addEventListener('keypress', e => {
+  if (e.key === 'Enter') { e.preventDefault(); addFollowUp(); }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Save / Delete
+// ═══════════════════════════════════════════════════════════════════
+async function saveReminder() {
+  const title = document.getElementById('inputTitle').value.trim();
+  const desc = document.getElementById('inputDesc').value.trim();
+  const date = document.getElementById('inputDate').value;
+  const time = document.getElementById('inputTime').value;
+  const repeat = document.getElementById('inputRepeat').value;
+
+  if (!title) { showToast('Please enter a title', 'red'); document.getElementById('inputTitle').focus(); return; }
+  if (!date || !time) { showToast('Please set a date and time', 'red'); return; }
+
+  const nextFireAt = new Date(`${date}T${time}`).getTime();
+  if (isNaN(nextFireAt)) { showToast('Invalid date/time', 'red'); return; }
+
+  let intervalMs = 0;
+  if (repeat === 'interval') {
+    const val = parseInt(document.getElementById('inputIntervalVal').value) || 0;
+    const unit = document.getElementById('inputIntervalUnit').value;
+    const unitMs = { min: 60000, hour: 3600000, day: 86400000 };
+    intervalMs = val * unitMs[unit];
+    if (intervalMs <= 0) { showToast('Please enter a valid interval', 'red'); return; }
+  }
+
+  const reminder = {
+    id: editingId || `r_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+    title,
+    description: desc,
+    nextFireAt,
+    repeat,
+    intervalMs,
+    followUps: followUps.map(f => ({ ...f })),
+    enabled: true,
+    createdAt: editingId ? (reminders.find(r => r.id === editingId)?.createdAt || Date.now()) : Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  await dbPut(reminder);
+  if (editingId) {
+    const idx = reminders.findIndex(r => r.id === editingId);
+    if (idx !== -1) reminders[idx] = reminder;
+    else reminders.push(reminder);
+  } else {
+    reminders.push(reminder);
+  }
+
+  closeModal();
+  renderAll();
+  scheduleAll();
+
+  if (Notification.permission !== 'granted') {
+    showToast('⚠️ Enable notifications to receive alerts', 'amber');
+  } else {
+    const diff = nextFireAt - Date.now();
+    if (diff > 0) {
+      const formatted = diff < 3600000
+        ? `in ${Math.round(diff / 60000)} min`
+        : diff < 86400000
+          ? `today at ${new Date(nextFireAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+          : `on ${new Date(nextFireAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+      showToast(`✅ Reminder set for ${formatted}`, 'green');
+    } else {
+      showToast('⚠️ Time is in the past!', 'amber');
+    }
+  }
+}
+
+async function deleteReminder(id) {
+  if (!confirm('Delete this reminder?')) return;
+  reminders = reminders.filter(r => r.id !== id);
+  await dbDelete(id);
+  if (scheduledTimers[id]) { clearTimeout(scheduledTimers[id]); delete scheduledTimers[id]; }
+  renderAll();
+  showToast('Reminder deleted', 'red');
+}
+
+async function toggleDone(id) {
+  const r = reminders.find(r => r.id === id);
+  if (!r) return;
+  if (r.enabled) {
+    r.enabled = false;
+    r.completedAt = Date.now();
+    showToast('✅ Marked as done!', 'green');
+  } else {
+    r.enabled = true;
+    r.completedAt = null;
+    showToast('↩ Reminder reactivated', 'amber');
+  }
+  await dbPut(r);
+  renderAll();
+  scheduleAll();
+}
+
+async function quickSnooze(id, minutes) {
+  const r = reminders.find(r => r.id === id);
+  if (!r) return;
+  r.nextFireAt = Date.now() + minutes * 60000;
+  r.enabled = true;
+  await dbPut(r);
+  renderAll();
+  scheduleAll();
+  showToast(`⏰ Snoozed for ${minutes} minutes`, 'amber');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PWA Install
+// ═══════════════════════════════════════════════════════════════════
+function setupInstallPrompt() {
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferInstall = e;
+    document.getElementById('installBanner').classList.remove('hidden');
+  });
+
+  window.addEventListener('appinstalled', () => {
+    document.getElementById('installBanner').classList.add('hidden');
+    deferInstall = null;
+    showToast('📲 App installed successfully!', 'green');
+  });
+}
+
+async function installPWA() {
+  if (deferInstall) {
+    deferInstall.prompt();
+    const { outcome } = await deferInstall.userChoice;
+    if (outcome === 'accepted') {
+      deferInstall = null;
+      document.getElementById('installBanner').classList.add('hidden');
+    }
+  } else {
+    showToast('To install: use "Add to Home Screen" in browser menu', 'blue');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Export & Utilities
+// ═══════════════════════════════════════════════════════════════════
+function exportReminders() {
+  const data = JSON.stringify(reminders, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `remindly-export-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📤 Reminders exported', 'green');
+}
+
+async function clearCompleted() {
+  const completed = reminders.filter(r => !r.enabled && r.completedAt);
+  if (!completed.length) { showToast('No completed reminders to clear', 'amber'); return; }
+  if (!confirm(`Delete ${completed.length} completed reminder(s)?`)) return;
+  for (const r of completed) { await dbDelete(r.id); }
+  reminders = reminders.filter(r => r.enabled || !r.completedAt);
+  renderAll();
+  showToast(`🗑️ Cleared ${completed.length} reminders`, 'green');
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Toast
+// ═══════════════════════════════════════════════════════════════════
+const toastIcons = { green: '✅', red: '❌', amber: '⚡', blue: 'ℹ️' };
+const toastColors = {
+  green: 'rgba(16,185,129,0.15)',
+  red: 'rgba(239,68,68,0.15)',
+  amber: 'rgba(245,158,11,0.15)',
+  blue: 'rgba(96,165,250,0.15)',
+};
+
+function showToast(msg, type = 'amber') {
+  const container = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.style.background = toastColors[type] || toastColors.amber;
+  el.innerHTML = `<span>${toastIcons[type] || '⚡'}</span><span>${msg}</span>`;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.classList.add('exit');
+    setTimeout(() => el.remove(), 350);
+  }, 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// URL params
+// ═══════════════════════════════════════════════════════════════════
+const urlParams = new URLSearchParams(location.search);
+if (urlParams.get('action') === 'add') {
+  setTimeout(openAddModal, 500);
+}
+</script>
+</body>
+</html>

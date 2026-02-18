@@ -1,0 +1,22 @@
+# Cloudflare Pages _headers
+# Ensures service workers, manifests, and PWA features work correctly
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/apps/*/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Content-Type: application/javascript; charset=utf-8
+  Service-Worker-Allowed: /
+
+/apps/*/manifest.json
+  Content-Type: application/manifest+json; charset=utf-8
+  Cache-Control: public, max-age=3600
+
+/*.html
+  Cache-Control: no-cache
+
+/apps/*/*.html
+  Cache-Control: no-cache
