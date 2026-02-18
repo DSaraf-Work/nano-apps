@@ -14,6 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chrono-node@2.6.4/dist/chrono.min.js"></script>
 <style>
 :root {
   --bg: #080c18;
@@ -897,6 +898,24 @@ input:checked + .toggle-slider:before { transform: translateX(18px); background:
 .timeline-content h4 { font-size: 14px; font-weight: 500; color: var(--text); }
 .timeline-content p { font-size: 12px; color: var(--text-dim); }
 
+#micBtn.recording {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+  animation: micPulse 1s ease-in-out infinite;
+}
+
+@keyframes micPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+}
+
+#micBtn.success {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #10b981;
+}
+
 /* Responsive */
 @media (max-width: 360px) {
   .summary-bar { grid-template-columns: repeat(3, 1fr); }
@@ -1082,7 +1101,42 @@ input:checked + .toggle-slider:before { transform: translateX(18px); background:
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">Title *</label>
-        <input type="text" id="inputTitle" class="form-input" placeholder="What do you need to remember?" maxlength="80"/>
+        <div style="display:flex; gap:8px; align-items:flex-start;">
+          <input type="text" id="inputTitle" class="form-input" placeholder="What do you need to remember?" maxlength="80" style="flex:1;"/>
+          <button type="button" id="micBtn" onclick="toggleVoice()" title="Speak your reminder" style="
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            color: var(--text-dim);
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s;
+          ">🎤</button>
+        </div>
+        <div id="voiceTranscript" style="
+          display: none;
+          font-size: 12px;
+          color: var(--text-dim);
+          font-style: italic;
+          margin-top: 6px;
+          padding: 6px 10px;
+          background: var(--surface2);
+          border-radius: 6px;
+          border: 1px solid var(--border);
+          min-height: 28px;
+        "></div>
+        <div id="voiceHint" style="
+          display: none;
+          font-size: 11px;
+          color: var(--text-muted);
+          margin-top: 4px;
+        ">Try: "remind me to call John tomorrow at 3pm"</div>
       </div>
       <div class="form-group">
         <label class="form-label">Description</label>
@@ -1845,6 +1899,171 @@ function showToast(msg, type = 'amber') {
     setTimeout(() => el.remove(), 350);
   }, 3000);
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// VOICE INPUT
+// ═══════════════════════════════════════════════════════════════════
+let recognition = null;
+let voiceActive = false;
+let silenceTimer = null;
+let finalTranscript = '';
+
+function initVoice() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    const btn = document.getElementById('micBtn');
+    if (btn) btn.style.display = 'none';
+    return false;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+  recognition.maxAlternatives = 1;
+
+  recognition.onresult = e => {
+    let interim = '';
+    finalTranscript = '';
+    for (let i = 0; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    const display = finalTranscript || interim;
+    const transcriptEl = document.getElementById('voiceTranscript');
+    if (transcriptEl) transcriptEl.textContent = display;
+
+    clearTimeout(silenceTimer);
+    if (finalTranscript) {
+      silenceTimer = setTimeout(() => processVoiceInput(finalTranscript.trim()), 1500);
+    }
+  };
+
+  recognition.onerror = e => {
+    if (e.error === 'not-allowed') showToast('Microphone permission denied', 'red');
+    else if (e.error !== 'aborted') showToast('Voice error: ' + e.error, 'red');
+    stopVoice();
+  };
+
+  recognition.onend = () => {
+    if (voiceActive) {
+      try { recognition.start(); } catch(e) { stopVoice(); }
+    }
+  };
+
+  return true;
+}
+
+function toggleVoice() {
+  if (voiceActive) {
+    stopVoice();
+    if (finalTranscript.trim()) processVoiceInput(finalTranscript.trim());
+  } else {
+    startVoice();
+  }
+}
+
+function startVoice() {
+  if (!recognition && !initVoice()) {
+    showToast('Voice not supported on this browser', 'red');
+    return;
+  }
+  finalTranscript = '';
+  const transcriptEl = document.getElementById('voiceTranscript');
+  const hintEl = document.getElementById('voiceHint');
+  const btn = document.getElementById('micBtn');
+  if (transcriptEl) { transcriptEl.style.display = 'block'; transcriptEl.textContent = ''; }
+  if (hintEl) hintEl.style.display = 'block';
+  if (btn) { btn.classList.add('recording'); btn.classList.remove('success'); btn.title = 'Tap to stop'; }
+  voiceActive = true;
+  try { recognition.start(); } catch(e) {}
+}
+
+function stopVoice() {
+  voiceActive = false;
+  clearTimeout(silenceTimer);
+  const btn = document.getElementById('micBtn');
+  if (btn) { btn.classList.remove('recording'); btn.title = 'Speak your reminder'; }
+  try { recognition.stop(); } catch(e) {}
+}
+
+function processVoiceInput(transcript) {
+  stopVoice();
+  if (!transcript) return;
+
+  const btn = document.getElementById('micBtn');
+  const hintEl = document.getElementById('voiceHint');
+
+  let cleaned = transcript
+    .replace(/^(remind me to|remind me|remember to|set a reminder to|set reminder to|hey|ok|okay)\s+/i, '')
+    .replace(/^(a |an |the )/i, '')
+    .trim();
+
+  let parsedDate = null;
+  let titleText = cleaned;
+
+  if (window.chrono) {
+    const results = chrono.parse(cleaned, new Date(), { forwardDate: true });
+    if (results.length > 0) {
+      parsedDate = results[0].start.date();
+      const matchedText = results[0].text;
+      titleText = cleaned
+        .replace(matchedText, '')
+        .replace(/\s+(at|on|by|in|for)\s*$/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+  }
+
+  if (titleText) titleText = titleText.charAt(0).toUpperCase() + titleText.slice(1);
+
+  const titleInput = document.getElementById('inputTitle');
+  if (titleInput && titleText) titleInput.value = titleText;
+
+  if (parsedDate) {
+    const dateStr = parsedDate.toISOString().slice(0, 10);
+    const timeStr = parsedDate.toTimeString().slice(0, 5);
+    const dateInput = document.getElementById('inputDate');
+    const timeInput = document.getElementById('inputTime');
+    if (dateInput) dateInput.value = dateStr;
+    if (timeInput) timeInput.value = timeStr;
+  }
+
+  if (btn) {
+    btn.classList.add('success');
+    btn.textContent = '✓';
+    setTimeout(() => { btn.textContent = '🎤'; btn.classList.remove('success'); }, 2000);
+  }
+
+  const transcriptEl = document.getElementById('voiceTranscript');
+  if (transcriptEl) {
+    transcriptEl.style.fontStyle = 'normal';
+    const timeInfo = parsedDate
+      ? ` · 🕐 ${parsedDate.toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'})} ${parsedDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`
+      : ' · ⚠️ No time detected — set manually';
+    transcriptEl.innerHTML = `<span style="color:var(--green)">✓</span> "${escHtml(transcript)}"${timeInfo}`;
+  }
+  if (hintEl) hintEl.style.display = 'none';
+
+  setTimeout(() => document.getElementById('inputDesc')?.focus(), 100);
+
+  if (!parsedDate) showToast('No time detected — please set manually', 'amber');
+  else showToast('✅ Reminder parsed from voice!', 'green');
+}
+
+// Reset voice UI when modal closes
+const _origCloseModal = closeModal;
+closeModal = function() {
+  stopVoice();
+  finalTranscript = '';
+  const transcriptEl = document.getElementById('voiceTranscript');
+  const hintEl = document.getElementById('voiceHint');
+  const btn = document.getElementById('micBtn');
+  if (transcriptEl) { transcriptEl.style.display = 'none'; transcriptEl.textContent = ''; transcriptEl.style.fontStyle = 'italic'; }
+  if (hintEl) hintEl.style.display = 'none';
+  if (btn) { btn.textContent = '🎤'; btn.classList.remove('recording', 'success'); }
+  _origCloseModal();
+};
 
 // ═══════════════════════════════════════════════════════════════════
 // URL params
