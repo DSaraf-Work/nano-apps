@@ -1376,8 +1376,13 @@ let scheduledTimers = {};
   if (inboundText && inboundText.trim()) {
     // Clean the URL immediately so a refresh doesn't re-trigger
     history.replaceState(null, '', location.pathname);
-    // Wait a tick for the UI to settle, then process exactly like a voice input
-    setTimeout(() => processVoiceInput(decodeURIComponent(inboundText.trim())), 300);
+    const text = inboundText.trim(); // URLSearchParams already decodes — no need for decodeURIComponent
+    showToast('⏳ Processing: ' + text.slice(0, 40) + (text.length > 40 ? '…' : ''), 'amber');
+    // Call _processVoiceInputInner directly — bypass voice state entirely
+    setTimeout(async () => {
+      try { await _processVoiceInputInner(text); }
+      catch (err) { showToast('Error: ' + err.message, 'red'); }
+    }, 500);
   }
 })();
 

@@ -117,6 +117,7 @@ body {
 }
 
 .app-card:active { transform: scale(0.96); }
+.app-card:has(.install-btn:active) { transform: none; }
 
 .card-main {
   display: flex;
@@ -126,6 +127,7 @@ body {
   color: inherit;
   padding: 20px 12px 10px;
   width: 100%;
+  cursor: pointer;
 }
 
 .app-icon {
@@ -162,6 +164,9 @@ body {
   width: 100%;
   display: block;
   text-align: center;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
 }
 
 .install-btn:hover {
