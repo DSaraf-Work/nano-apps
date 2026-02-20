@@ -45,17 +45,18 @@ export async function onRequest(ctx) {
 
     const { title, description = '', nextFireAt: rawFireAt, repeat = 'none', intervalMs = 0, followUps = [] } = body;
 
-    if (!title || !rawFireAt) {
-      return json({ error: 'title and nextFireAt are required' }, 400);
+    if (!title) {
+      return json({ error: 'title is required' }, 400);
     }
 
-    // Accept either a Unix ms timestamp (number) or an ISO 8601 string (from iOS Shortcuts Format Date)
-    const nextFireAt = typeof rawFireAt === 'number'
-      ? rawFireAt
-      : new Date(rawFireAt).getTime();
-
-    if (isNaN(nextFireAt)) {
-      return json({ error: 'nextFireAt could not be parsed as a date' }, 400);
+    // nextFireAt is optional — omit it to send raw text for client-side parsing.
+    // Accepts: Unix ms number, ISO 8601 string, or absent/0 (raw text mode).
+    let nextFireAt = 0;
+    if (rawFireAt) {
+      nextFireAt = typeof rawFireAt === 'number'
+        ? rawFireAt
+        : new Date(rawFireAt).getTime();
+      if (isNaN(nextFireAt)) nextFireAt = 0;
     }
 
     const id = `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

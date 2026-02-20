@@ -2059,22 +2059,31 @@ async function syncFromAPI() {
     let added = 0;
     for (const r of incoming) {
       if (reminders.find(x => x.id === r.id)) continue; // already in IndexedDB
-      const full = {
-        ...r,
-        enabled: true,
-        fired: false,
-        snoozed: false,
-        completedAt: null,
-        updatedAt: Date.now(),
-      };
-      await dbPut(full);
-      reminders.push(full);
-      added++;
-      // Fire-and-forget: mark synced on server
+
+      // Mark synced on server immediately (fire-and-forget)
       fetch(`${SYNC_API}/${r.id}/synced`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${SYNC_KEY}` },
       }).catch(() => {});
+
+      if (!r.nextFireAt) {
+        // Raw voice text — run through the same NLP pipeline as the mic button.
+        // _processVoiceInputInner handles saving, toasts, and the edit modal.
+        await _processVoiceInputInner(r.title, { fromUrl: true });
+      } else {
+        // Pre-parsed reminder (nextFireAt already set) — save directly.
+        const full = {
+          ...r,
+          enabled: true,
+          fired: false,
+          snoozed: false,
+          completedAt: null,
+          updatedAt: Date.now(),
+        };
+        await dbPut(full);
+        reminders.push(full);
+        added++;
+      }
     }
 
     if (added > 0) {
