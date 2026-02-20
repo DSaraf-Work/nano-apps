@@ -43,10 +43,19 @@ export async function onRequest(ctx) {
     try { body = await request.json(); }
     catch { return json({ error: 'Invalid JSON' }, 400); }
 
-    const { title, description = '', nextFireAt, repeat = 'none', intervalMs = 0, followUps = [] } = body;
+    const { title, description = '', nextFireAt: rawFireAt, repeat = 'none', intervalMs = 0, followUps = [] } = body;
 
-    if (!title || !nextFireAt) {
+    if (!title || !rawFireAt) {
       return json({ error: 'title and nextFireAt are required' }, 400);
+    }
+
+    // Accept either a Unix ms timestamp (number) or an ISO 8601 string (from iOS Shortcuts Format Date)
+    const nextFireAt = typeof rawFireAt === 'number'
+      ? rawFireAt
+      : new Date(rawFireAt).getTime();
+
+    if (isNaN(nextFireAt)) {
+      return json({ error: 'nextFireAt could not be parsed as a date' }, 400);
     }
 
     const id = `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
