@@ -1377,6 +1377,9 @@ let scheduledTimers = {};
   try { setupInstallPrompt(); } catch(e) { console.error('[remindly] setupInstallPrompt:', e); }
   try { setDefaultDateTime(); } catch(e) { console.error('[remindly] setDefaultDateTime:', e); }
 
+  // Sync reminders created via iOS Shortcuts (fire-and-forget, non-blocking)
+  syncFromAPI().catch(() => {});
+
   // Live clock in time display
   setInterval(() => {
     const el = document.querySelector('.time-display');
@@ -2032,6 +2035,55 @@ async function installPWA() {
     }
   } else {
     showToast('To install: use "Add to Home Screen" in browser menu', 'blue');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Shortcuts Sync — pull reminders created via iOS Shortcut from API
+// ═══════════════════════════════════════════════════════════════════
+const SYNC_API = '/api/reminders';
+// API key is validated server-side; this read-key is safe to embed (personal app)
+const SYNC_KEY = 'f823544fd9639dd9e6f146f4e82d9b084316ab2092536ef73cc40026ae75f1a6';
+
+async function syncFromAPI() {
+  if (!SYNC_KEY || SYNC_KEY.startsWith('REPLACE')) return; // not configured yet
+  try {
+    const res = await fetch(SYNC_API, {
+      headers: { 'Authorization': `Bearer ${SYNC_KEY}` },
+    });
+    if (!res.ok) { console.warn('[remindly] sync HTTP', res.status); return; }
+
+    const { reminders: incoming } = await res.json();
+    if (!incoming || !incoming.length) return;
+
+    let added = 0;
+    for (const r of incoming) {
+      if (reminders.find(x => x.id === r.id)) continue; // already in IndexedDB
+      const full = {
+        ...r,
+        enabled: true,
+        fired: false,
+        snoozed: false,
+        completedAt: null,
+        updatedAt: Date.now(),
+      };
+      await dbPut(full);
+      reminders.push(full);
+      added++;
+      // Fire-and-forget: mark synced on server
+      fetch(`${SYNC_API}/${r.id}/synced`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${SYNC_KEY}` },
+      }).catch(() => {});
+    }
+
+    if (added > 0) {
+      renderAll();
+      scheduleAll();
+      showToast(`✅ ${added} reminder${added > 1 ? 's' : ''} synced from Shortcuts`, 'green');
+    }
+  } catch (e) {
+    console.warn('[remindly] syncFromAPI failed:', e);
   }
 }
 
